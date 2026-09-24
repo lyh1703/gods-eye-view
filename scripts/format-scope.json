@@ -840,5 +840,5 @@
   "scripts/qa-recent-imagery.mjs",
   "src/argus/argusFoundation.test.mjs",
   "scripts/argus-smoke.mjs",
-  "src/argus/argusLiveSmoke.test.mjs"
+  "src/argus/argusSmoke.test.mjs"
 ]
