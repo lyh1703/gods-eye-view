@@ -72,8 +72,14 @@ test('H3 wrapper converts polygons and aggregates point observations', () => {
     { resolution: 8 },
   );
 
-  assert.equal(groups.reduce((sum, group) => sum + group.count, 0), 3);
-  assert.equal(groups.some((group) => group.count >= 2), true);
+  assert.equal(
+    groups.reduce((sum, group) => sum + group.count, 0),
+    3,
+  );
+  assert.equal(
+    groups.some((group) => group.count >= 2),
+    true,
+  );
 });
 
 test('geometry wrapper provides distance, bbox and polygon predicates', () => {
@@ -102,11 +108,11 @@ test('geometry wrapper provides distance, bbox and polygon predicates', () => {
   assert.equal(geometryPointInPolygon([126.9, 37.5], polygon), false);
   assert.equal(geometryPointInPolygon([127.2, 37.5], polygon), false);
   assert.equal(
-    geometryBboxesIntersect([126.8, 37.4, 127, 37.6], [126.9, 37.5, 127.1, 37.7]),
+    geometryBboxesIntersect(
+      [126.8, 37.4, 127, 37.6],
+      [126.9, 37.5, 127.1, 37.7],
+    ),
     true,
   );
-  assert.equal(
-    geometryDistanceKm([126.9, 37.5], [126.9, 37.51]) > 1,
-    true,
-  );
+  assert.equal(geometryDistanceKm([126.9, 37.5], [126.9, 37.51]) > 1, true);
 });

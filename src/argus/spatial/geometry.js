@@ -34,7 +34,11 @@ function pointOnSegment(point, left, right, epsilon = 1e-12) {
 function pointInRing(point, ring) {
   let inside = false;
 
-  for (let index = 0, previous = ring.length - 1; index < ring.length; previous = index++) {
+  for (
+    let index = 0, previous = ring.length - 1;
+    index < ring.length;
+    previous = index++
+  ) {
     const left = ring[previous];
     const right = ring[index];
     if (pointOnSegment(point, left, right)) return true;
@@ -43,8 +47,7 @@ function pointInRing(point, ring) {
     const [x1, y1] = left;
     const [x2, y2] = right;
     const intersects =
-      y1 > y !== y2 > y &&
-      x < ((x2 - x1) * (y - y1)) / (y2 - y1) + x1;
+      y1 > y !== y2 > y && x < ((x2 - x1) * (y - y1)) / (y2 - y1) + x1;
     if (intersects) inside = !inside;
   }
 

@@ -36,16 +36,9 @@ function normalizePoint(point) {
   return [longitude, latitude];
 }
 
-export function pointToH3Cell(
-  point,
-  resolution = DEFAULT_H3_RESOLUTION,
-) {
+export function pointToH3Cell(point, resolution = DEFAULT_H3_RESOLUTION) {
   const [longitude, latitude] = normalizePoint(point);
-  return latLngToCell(
-    latitude,
-    longitude,
-    validateH3Resolution(resolution),
-  );
+  return latLngToCell(latitude, longitude, validateH3Resolution(resolution));
 }
 
 export function h3CellBoundary(cell) {
@@ -69,13 +62,12 @@ export function h3CellNeighbors(
   }
 
   const cells = gridDisk(cell, size);
-  return includeOrigin ? cells : cells.filter((candidate) => candidate !== cell);
+  return includeOrigin
+    ? cells
+    : cells.filter((candidate) => candidate !== cell);
 }
 
-export function polygonToH3Cells(
-  geometry,
-  resolution = DEFAULT_H3_RESOLUTION,
-) {
+export function polygonToH3Cells(geometry, resolution = DEFAULT_H3_RESOLUTION) {
   if (
     !geometry ||
     geometry.type !== 'Polygon' ||
