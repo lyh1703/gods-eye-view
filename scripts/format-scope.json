@@ -840,5 +840,7 @@
   "scripts/qa-recent-imagery.mjs",
   "src/argus/argusFoundation.test.mjs",
   "scripts/argus-smoke.mjs",
-  "src/argus/argusSmoke.test.mjs"
+  "src/argus/argusSmoke.test.mjs",
+  "src/argus/worldOperations.js",
+  "src/argus/argusWorldApis.test.mjs"
 ]
