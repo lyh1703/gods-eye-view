@@ -34,7 +34,7 @@
   "scripts": {
     "doctor": "node scripts/setup-doctor.mjs",
     "format": "node scripts/format.mjs --write",
-    "format:check": "node scripts/format.mjs --write && git diff --exit-code -- src/argus/spatial/geometry.js src/argus/argusSpatialCore.test.mjs",
+    "format:check": "node scripts/format.mjs --check",
     "dev": "vite",
     "dev:secure": "./scripts/dev-secure.sh",
     "opensky:import": "./scripts/opensky-import-client.sh",
