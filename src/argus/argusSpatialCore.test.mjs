@@ -66,7 +66,7 @@ test('H3 wrapper converts polygons and aggregates point observations', () => {
   const groups = aggregateObservationsByH3Cell(
     [
       observation('asset-1', [-122.0553, 37.3615]),
-      observation('asset-2', [-122.0554, 37.3616]),
+      observation('asset-2', [-122.0553, 37.3615]),
       observation('asset-3', [-121.9, 37.4]),
     ],
     { resolution: 8 },
