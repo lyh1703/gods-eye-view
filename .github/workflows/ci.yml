@@ -36,11 +36,8 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
 
-      - name: Generate ARGUS H3 lockfile patch
-        run: |
-          npm install --package-lock-only h3-js@4.5.0
-          git diff -- package.json package-lock.json
-          exit 1
+      - name: Install locked dependencies
+        run: npm ci
 
       - name: Run setup policy checks
         run: npm run doctor -- --json
