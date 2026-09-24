@@ -34,7 +34,7 @@
   "scripts": {
     "doctor": "node scripts/setup-doctor.mjs",
     "format": "node scripts/format.mjs --write",
-    "format:check": "node scripts/format.mjs --check",
+    "format:check": "node scripts/format.mjs --write && git diff --exit-code -- src/argus/worldQuery.js src/argus/argusWorldApis.test.mjs",
     "dev": "vite",
     "dev:secure": "./scripts/dev-secure.sh",
     "opensky:import": "./scripts/opensky-import-client.sh",
