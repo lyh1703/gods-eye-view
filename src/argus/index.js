@@ -5,6 +5,21 @@ export {
 export { createProviderRegistry } from './providerRegistry.js';
 export { createWorldQueryEngine } from './worldQuery.js';
 export {
+  aggregateObservationsByH3Cell,
+  DEFAULT_H3_RESOLUTION,
+  h3CellBoundary,
+  h3CellNeighbors,
+  pointToH3Cell,
+  polygonToH3Cells,
+  validateH3Resolution,
+} from './spatial/h3Index.js';
+export {
+  geometryBbox,
+  geometryBboxesIntersect,
+  geometryDistanceKm,
+  geometryPointInPolygon,
+} from './spatial/geometry.js';
+export {
   compareWorldSnapshots,
   haversineDistanceKm,
   latestByProviderScopedEntity,
