@@ -8,7 +8,10 @@ export function createWorldQueryEngine({
   const adapterMap = new Map();
 
   function registerAdapter(adapter, options) {
-    if (!adapter?.metadata?.provider_id || typeof adapter.query !== 'function') {
+    if (
+      !adapter?.metadata?.provider_id ||
+      typeof adapter.query !== 'function'
+    ) {
       throw new TypeError('adapter requires metadata.provider_id and query()');
     }
 

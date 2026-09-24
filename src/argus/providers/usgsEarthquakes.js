@@ -73,7 +73,8 @@ export function createUsgsEarthquakesAdapter({
         .map((feature) => {
           const properties = feature.properties ?? {};
           const observedAt = new Date(properties.time);
-          const reviewed = String(properties.status).toLowerCase() === 'reviewed';
+          const reviewed =
+            String(properties.status).toLowerCase() === 'reviewed';
 
           return createObservationEnvelope({
             provider_id: USGS_EARTHQUAKES_PROVIDER.provider_id,
@@ -93,11 +94,9 @@ export function createUsgsEarthquakesAdapter({
             },
             coverage: USGS_EARTHQUAKES_PROVIDER.coverage,
             confidence: reviewed ? 0.99 : 0.9,
-            source_url:
-              properties.url ?? USGS_EARTHQUAKES_PROVIDER.source_url,
+            source_url: properties.url ?? USGS_EARTHQUAKES_PROVIDER.source_url,
             license_class: USGS_EARTHQUAKES_PROVIDER.license_class,
-            commercial_allowed:
-              USGS_EARTHQUAKES_PROVIDER.commercial_allowed,
+            commercial_allowed: USGS_EARTHQUAKES_PROVIDER.commercial_allowed,
             attribution_required:
               USGS_EARTHQUAKES_PROVIDER.attribution_required,
             retention_policy: USGS_EARTHQUAKES_PROVIDER.retention_policy,
