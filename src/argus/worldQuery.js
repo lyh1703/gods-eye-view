@@ -207,10 +207,7 @@ export function createWorldQueryEngine({
         .map((observation) => {
           const coordinates = pointCoordinates(observation);
           if (!coordinates) return null;
-          const distanceKm = haversineDistanceKm(
-            normalizedCenter,
-            coordinates,
-          );
+          const distanceKm = haversineDistanceKm(normalizedCenter, coordinates);
           if (distanceKm > radiusKm) return null;
           return {
             distance_km: distanceKm,

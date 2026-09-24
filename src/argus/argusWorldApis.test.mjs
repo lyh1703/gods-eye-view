@@ -1,10 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import {
-  createObservationEnvelope,
-  createWorldQueryEngine,
-} from './index.js';
+import { createObservationEnvelope, createWorldQueryEngine } from './index.js';
 
 function providerMetadata(providerId) {
   return {
@@ -41,9 +38,7 @@ function observation({
     observation_type: 'state',
     timestamp_observed: observedAt,
     timestamp_received: observedAt,
-    geometry: coordinates
-      ? { type: 'Point', coordinates }
-      : null,
+    geometry: coordinates ? { type: 'Point', coordinates } : null,
     properties: { value },
     source_url: `https://example.test/${providerId}/${entityId}`,
     license_class: 'test',
@@ -64,10 +59,7 @@ function createFixtureAdapter(providerId, observationsByMarker) {
         observationsByMarker.default ??
         [];
       return source.filter((item) => {
-        if (
-          filters.entity_type &&
-          item.entity_type !== filters.entity_type
-        ) {
+        if (filters.entity_type && item.entity_type !== filters.entity_type) {
           return false;
         }
         if (filters.entity_id && item.entity_id !== filters.entity_id) {
@@ -152,7 +144,10 @@ test('world.nearby returns point observations ordered by distance', async () => 
     result.results.map(({ observation: item }) => item.entity_id),
     ['near', 'farther'],
   );
-  assert.equal(result.results[0].distance_km < result.results[1].distance_km, true);
+  assert.equal(
+    result.results[0].distance_km < result.results[1].distance_km,
+    true,
+  );
   assert.equal(result.providers[0].count, 2);
 });
 
