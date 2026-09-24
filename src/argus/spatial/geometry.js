@@ -22,12 +22,18 @@ function pointOnSegment(point, left, right, epsilon = 1e-12) {
   const [x, y] = point;
   const [x1, y1] = left;
   const [x2, y2] = right;
-  const cross = (y - y1) * (x2 - x1) - (x - x1) * (y2 - y1);
+  const deltaX = x2 - x1;
+  const deltaY = y2 - y1;
+  const squaredLength = deltaX ** 2 + deltaY ** 2;
+  if (squaredLength <= epsilon) {
+    return Math.abs(x - x1) <= epsilon && Math.abs(y - y1) <= epsilon;
+  }
+
+  const cross = (y - y1) * deltaX - (x - x1) * deltaY;
   if (Math.abs(cross) > epsilon) return false;
 
-  const dot = (x - x1) * (x2 - x1) + (y - y1) * (y2 - y1);
+  const dot = (x - x1) * deltaX + (y - y1) * deltaY;
   if (dot < -epsilon) return false;
-  const squaredLength = (x2 - x1) ** 2 + (y2 - y1) ** 2;
   return dot <= squaredLength + epsilon;
 }
 
