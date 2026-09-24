@@ -54,9 +54,7 @@ export function createProviderRegistry(initialProviders = []) {
   function register(provider, { replace = false } = {}) {
     const normalized = normalizeProvider(provider);
     if (providers.has(normalized.provider_id) && !replace) {
-      throw new Error(
-        `provider already registered: ${normalized.provider_id}`,
-      );
+      throw new Error(`provider already registered: ${normalized.provider_id}`);
     }
     providers.set(normalized.provider_id, normalized);
     return normalized;
