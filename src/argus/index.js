@@ -5,6 +5,11 @@ export {
 export { createProviderRegistry } from './providerRegistry.js';
 export { createWorldQueryEngine } from './worldQuery.js';
 export {
+  createInMemoryWorldMemory,
+  validateWorldMemoryRepository,
+  WORLD_MEMORY_REPOSITORY_METHODS,
+} from './memory/worldMemory.js';
+export {
   aggregateObservationsByH3Cell,
   DEFAULT_H3_RESOLUTION,
   h3CellBoundary,

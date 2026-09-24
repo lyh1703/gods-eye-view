@@ -27,9 +27,18 @@ function observedDescending(left, right) {
 export function createWorldQueryEngine({
   providerRegistry = createProviderRegistry(),
   adapters = [],
+  worldMemory = null,
   now = () => new Date(),
 } = {}) {
   const adapterMap = new Map();
+  if (worldMemory !== null) {
+    if (
+      typeof worldMemory !== 'object' ||
+      typeof worldMemory.history !== 'function'
+    ) {
+      throw new TypeError('worldMemory requires history()');
+    }
+  }
 
   function registerAdapter(adapter, options) {
     if (
@@ -235,6 +244,75 @@ export function createWorldQueryEngine({
     };
   }
 
+  async function history({
+    entity_type,
+    entity_id,
+    provider_ids,
+    from = null,
+    to = null,
+    limit = 100,
+    order = 'desc',
+  } = {}) {
+    const entityType = requireNonEmptyString(entity_type, 'entity_type');
+    const entityId = requireNonEmptyString(entity_id, 'entity_id');
+
+    if (!worldMemory) {
+      return {
+        as_of: now().toISOString(),
+        entity: {
+          entity_type: entityType,
+          entity_id: entityId,
+        },
+        memory: {
+          ok: false,
+          backend: null,
+          error: 'world-memory-not-configured',
+        },
+        observations: [],
+      };
+    }
+
+    try {
+      const observations = await worldMemory.history({
+        entity_type: entityType,
+        entity_id: entityId,
+        provider_ids,
+        from,
+        to,
+        limit,
+        order,
+      });
+
+      return {
+        as_of: now().toISOString(),
+        entity: {
+          entity_type: entityType,
+          entity_id: entityId,
+        },
+        memory: {
+          ok: true,
+          backend: worldMemory.kind ?? 'unknown',
+          error: null,
+        },
+        observations: Array.isArray(observations) ? observations : [],
+      };
+    } catch (error) {
+      return {
+        as_of: now().toISOString(),
+        entity: {
+          entity_type: entityType,
+          entity_id: entityId,
+        },
+        memory: {
+          ok: false,
+          backend: worldMemory.kind ?? 'unknown',
+          error: error instanceof Error ? error.message : String(error),
+        },
+        observations: [],
+      };
+    }
+  }
+
   async function compare({ left = {}, right = {} } = {}) {
     const [leftSnapshot, rightSnapshot] = await Promise.all([
       query(left),
@@ -258,8 +336,10 @@ export function createWorldQueryEngine({
     entity,
     nearby,
     compare,
+    history,
     registerAdapter,
     providerRegistry,
+    worldMemory,
     getAdapter: (providerId) => adapterMap.get(providerId) ?? null,
   });
 }
