@@ -845,5 +845,7 @@
   "src/argus/argusWorldApis.test.mjs",
   "src/argus/spatial/h3Index.js",
   "src/argus/spatial/geometry.js",
-  "src/argus/argusSpatialCore.test.mjs"
+  "src/argus/argusSpatialCore.test.mjs",
+  "src/argus/memory/repository.js",
+  "src/argus/argusWorldMemoryRepository.test.mjs"
 ]

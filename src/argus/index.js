@@ -1,4 +1,9 @@
 export {
+  createInMemoryWorldMemoryRepository,
+  validateWorldMemoryRepository,
+  WORLD_MEMORY_REPOSITORY_METHODS,
+} from './memory/repository.js';
+export {
   createObservationEnvelope,
   validateObservationEnvelope,
 } from './observationEnvelope.js';
