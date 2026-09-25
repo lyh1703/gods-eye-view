@@ -38,8 +38,7 @@ export function validateRuViewCsiFrame(frame) {
   if (!frame || typeof frame !== 'object')
     throw new TypeError('frame must be an object');
   const amplitude = asFiniteArray(frame.amplitude, 'amplitude');
-  const phase =
-    frame.phase == null ? [] : asFiniteArray(frame.phase, 'phase');
+  const phase = frame.phase == null ? [] : asFiniteArray(frame.phase, 'phase');
   if (phase.length && phase.length !== amplitude.length)
     throw new TypeError('phase length must match amplitude length');
   const rssi = frame.rssi_dbm == null ? null : Number(frame.rssi_dbm);
@@ -56,9 +55,7 @@ export function validateRuViewCsiFrame(frame) {
 }
 export function ruViewFrameToObservation(frame, previousFrame = null) {
   const current = validateRuViewCsiFrame(frame);
-  const previous = previousFrame
-    ? validateRuViewCsiFrame(previousFrame)
-    : null;
+  const previous = previousFrame ? validateRuViewCsiFrame(previousFrame) : null;
   const avg = mean(current.amplitude);
   const simulated = Boolean(current.synthetic ?? current.simulated);
   return {
@@ -117,12 +114,10 @@ export function makeSimulatedRuViewSequence(opts = {}) {
         Math.sin((t / frames) * Math.PI * 2 + k * 0.07) * motionAmplitude,
     ),
     phase: Array.from({ length: subcarriers }, (_, k) =>
-      Math.atan2(
-        Math.sin(k * 0.11 + t * 0.03),
-        Math.cos(k * 0.11 + t * 0.03),
-      ),
+      Math.atan2(Math.sin(k * 0.11 + t * 0.03), Math.cos(k * 0.11 + t * 0.03)),
     ),
     rssi_dbm: -48,
     synthetic: true,
   }));
 }
+
