@@ -20,7 +20,7 @@ jobs:
       - name: Format and print Stage 3 files
         shell: bash
         run: |
-          npm run format -- --write
+          npm run format
           echo '===RUViewCSI-BEGIN==='
           cat src/sources/ruviewCsi.js
           echo '===RUViewCSI-END==='
