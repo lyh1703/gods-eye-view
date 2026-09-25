@@ -51,11 +51,6 @@ export function buildGeoClipSidecarCommand(imagePath, opts = {}) {
     throw new TypeError('imagePath is required');
   if (!Number.isInteger(topK) || topK < 1 || topK > 20)
     throw new TypeError('topK must be 1..20');
-  return [
-    python,
-    'scripts/geoclip-poc.py',
-    imagePath,
-    '--top-k',
-    String(topK),
-  ];
+  return [python, 'scripts/geoclip-poc.py', imagePath, '--top-k', String(topK)];
 }
+
