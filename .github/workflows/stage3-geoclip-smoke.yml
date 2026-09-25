@@ -19,11 +19,6 @@ jobs:
       - name: Run real GeoCLIP inference on packaged Kauai sample
         shell: bash
         run: |
-          IMAGE_PATH="$(python - <<'PY'
-import pathlib
-import geoclip
-print(pathlib.Path(geoclip.__file__).resolve().parent / 'images' / 'Kauai.png')
-PY
-)"
+          IMAGE_PATH="$(python -c "import pathlib, geoclip; print(pathlib.Path(geoclip.__file__).resolve().parent / 'images' / 'Kauai.png')")"
           test -f "$IMAGE_PATH"
           python scripts/geoclip-poc.py "$IMAGE_PATH" --top-k 3
