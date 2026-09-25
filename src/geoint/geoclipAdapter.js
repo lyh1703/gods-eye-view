@@ -53,4 +53,3 @@ export function buildGeoClipSidecarCommand(imagePath, opts = {}) {
     throw new TypeError('topK must be 1..20');
   return [python, 'scripts/geoclip-poc.py', imagePath, '--top-k', String(topK)];
 }
-
