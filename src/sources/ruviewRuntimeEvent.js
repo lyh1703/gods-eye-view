@@ -84,7 +84,9 @@ export function ruViewRuntimeEventToObservation(event) {
         upstreamType: 'CsiData',
         mode: event.synthetic === true ? 'simulated' : 'live',
       },
-      observedAt: new Date(finite(event.timestamp_unix_ms, 'timestamp_unix_ms')).toISOString(),
+      observedAt: new Date(
+        finite(event.timestamp_unix_ms, 'timestamp_unix_ms'),
+      ).toISOString(),
       measurements: {
         nodeId: Number(event.node_id ?? 0),
         antennas: Number(event.n_antennas ?? 0),
