@@ -23,12 +23,9 @@ function observation({
     observation_type: observationType,
     timestamp_observed: observedAt,
     timestamp_received: observedAt,
-    geometry: coordinates
-      ? { type: 'Point', coordinates }
-      : null,
+    geometry: coordinates ? { type: 'Point', coordinates } : null,
     properties: { value },
-    source_url:
-      'https://example.test/' + providerId + '/' + entityId,
+    source_url: 'https://example.test/' + providerId + '/' + entityId,
     license_class: 'test',
     commercial_allowed: false,
     attribution_required: false,
@@ -144,6 +141,13 @@ test('queryObservations supports bbox and observation type filters', async () =>
       value: 2,
     }),
     observation({
+      entityId: 'no-geometry',
+      observationType: 'position',
+      observedAt: '2026-09-25T00:01:30Z',
+      coordinates: null,
+      value: 4,
+    }),
+    observation({
       entityId: 'inside-state',
       observationType: 'state',
       observedAt: '2026-09-25T00:02:00Z',
@@ -202,10 +206,7 @@ test('queryNearby returns exact point results ordered by distance', async () => 
     result.map((item) => item.observation.entity_id),
     ['near', 'farther'],
   );
-  assert.equal(
-    result[0].distance_km < result[1].distance_km,
-    true,
-  );
+  assert.equal(result[0].distance_km < result[1].distance_km, true);
 });
 
 test('ingestion run state round-trips without exposing mutable storage', async () => {
@@ -232,9 +233,6 @@ test('ingestion run state round-trips without exposing mutable storage', async (
 
   const completed = await memory.getIngestionRun('run-1');
   assert.equal(completed.status, 'SUCCEEDED');
-  assert.equal(
-    completed.completed_at,
-    '2026-09-25T00:01:00.000Z',
-  );
+  assert.equal(completed.completed_at, '2026-09-25T00:01:00.000Z');
   assert.equal(memory.ingestionRunCount(), 1);
 });

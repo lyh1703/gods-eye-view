@@ -1,8 +1,5 @@
 import { validateObservationEnvelope } from '../observationEnvelope.js';
-import {
-  geometryBbox,
-  geometryBboxesIntersect,
-} from '../spatial/geometry.js';
+import { geometryBbox, geometryBboxesIntersect } from '../spatial/geometry.js';
 import {
   haversineDistanceKm,
   normalizeWorldPoint,
@@ -138,10 +135,7 @@ function normalizeObservationQuery({
     providerEntityId:
       provider_entity_id == null
         ? null
-        : requireNonEmptyString(
-            provider_entity_id,
-            'provider_entity_id',
-          ),
+        : requireNonEmptyString(provider_entity_id, 'provider_entity_id'),
     observationType:
       observation_type == null
         ? null
@@ -160,10 +154,7 @@ function observationMatches(record, query) {
   if (query.providerSet && !query.providerSet.has(observation.provider_id)) {
     return false;
   }
-  if (
-    query.entityType &&
-    observation.entity_type !== query.entityType
-  ) {
+  if (query.entityType && observation.entity_type !== query.entityType) {
     return false;
   }
   if (
@@ -183,6 +174,7 @@ function observationMatches(record, query) {
   if (observed < query.fromMs || observed > query.toMs) return false;
 
   if (query.bbox) {
+    if (!observation.geometry) return false;
     const observationBbox = geometryBbox(observation.geometry);
     if (
       !observationBbox ||
@@ -196,7 +188,8 @@ function observationMatches(record, query) {
 }
 
 function compareRecords(left, right, order) {
-  const delta = observedAtMs(left.observation) - observedAtMs(right.observation);
+  const delta =
+    observedAtMs(left.observation) - observedAtMs(right.observation);
   if (delta !== 0) return order === 'asc' ? delta : -delta;
   return order === 'asc'
     ? left.sequence - right.sequence
@@ -222,10 +215,7 @@ function normalizeIngestionRun(run) {
     run.completed_at,
     'completed_at',
   );
-  if (
-    completedAt &&
-    Date.parse(completedAt) < Date.parse(startedAt)
-  ) {
+  if (completedAt && Date.parse(completedAt) < Date.parse(startedAt)) {
     throw new RangeError('completed_at must not be before started_at');
   }
 
@@ -278,8 +268,7 @@ export function createInMemoryWorldMemoryRepository({
       const result = validateObservationEnvelope(observation);
       if (!result.ok) {
         throw new TypeError(
-          'invalid observation for World Memory: ' +
-            result.errors.join('; '),
+          'invalid observation for World Memory: ' + result.errors.join('; '),
         );
       }
       return cloneValue(observation);
@@ -339,9 +328,7 @@ export function createInMemoryWorldMemoryRepository({
     const normalizedCenter = normalizeWorldPoint(center);
     const radiusKm = Number(radius_km);
     if (!Number.isFinite(radiusKm) || radiusKm < 0) {
-      throw new TypeError(
-        'radius_km must be a non-negative finite number',
-      );
+      throw new TypeError('radius_km must be a non-negative finite number');
     }
 
     const candidates = await queryObservations({
@@ -359,10 +346,7 @@ export function createInMemoryWorldMemoryRepository({
         const coordinates = pointCoordinates(observation);
         if (!coordinates) return null;
 
-        const distanceKm = haversineDistanceKm(
-          normalizedCenter,
-          coordinates,
-        );
+        const distanceKm = haversineDistanceKm(normalizedCenter, coordinates);
         if (distanceKm > radiusKm) return null;
 
         return {
@@ -377,18 +361,12 @@ export function createInMemoryWorldMemoryRepository({
 
   async function saveIngestionRun(run) {
     const normalized = normalizeIngestionRun(run);
-    ingestionRuns.set(
-      normalized.ingestion_run_id,
-      cloneValue(normalized),
-    );
+    ingestionRuns.set(normalized.ingestion_run_id, cloneValue(normalized));
     return cloneValue(normalized);
   }
 
   async function getIngestionRun(ingestionRunId) {
-    const id = requireNonEmptyString(
-      ingestionRunId,
-      'ingestion_run_id',
-    );
+    const id = requireNonEmptyString(ingestionRunId, 'ingestion_run_id');
     return cloneValue(ingestionRuns.get(id) ?? null);
   }
 
