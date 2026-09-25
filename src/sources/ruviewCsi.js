@@ -120,4 +120,3 @@ export function makeSimulatedRuViewSequence(opts = {}) {
     synthetic: true,
   }));
 }
-
