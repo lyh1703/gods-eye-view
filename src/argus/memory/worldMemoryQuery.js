@@ -140,7 +140,9 @@ function evidenceStatus(observations, asOf, basis) {
     if (fingerprints.size > 1) {
       conflicts.push({
         canonical_entity_id: canonicalEntityId,
-        provider_ids: [...new Set(items.map((item) => item.provider_id))].sort(),
+        provider_ids: [
+          ...new Set(items.map((item) => item.provider_id)),
+        ].sort(),
         observation_ids: items
           .map((item) => item.observation_id)
           .filter(Boolean)
@@ -336,7 +338,12 @@ export function createWorldMemoryQueryEngine({
     };
   }
 
-  async function history(identityInput, start = null, end = null, options = {}) {
+  async function history(
+    identityInput,
+    start = null,
+    end = null,
+    options = {},
+  ) {
     const identity = normalizeIdentity(identityInput);
     const basis = normalizeTimeBasis(options.time_basis);
     const from = start == null ? null : toIso(start, 'start');
@@ -361,11 +368,7 @@ export function createWorldMemoryQueryEngine({
       end: to,
       count: observations.length,
       observations,
-      evidence: evidenceStatus(
-        observations,
-        to ?? now().toISOString(),
-        basis,
-      ),
+      evidence: evidenceStatus(observations, to ?? now().toISOString(), basis),
     };
   }
 

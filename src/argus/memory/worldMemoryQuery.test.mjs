@@ -85,17 +85,11 @@ async function fixture() {
 test('world.get reconstructs canonical point-in-time state using effective time', async () => {
   const world = await fixture();
 
-  const beforeRevision = await world.get(
-    CANONICAL_ID,
-    '2026-09-28T00:04:59Z',
-  );
+  const beforeRevision = await world.get(CANONICAL_ID, '2026-09-28T00:04:59Z');
   assert.equal(beforeRevision.states.length, 1);
   assert.equal(beforeRevision.state.properties.value, 1);
 
-  const afterRevision = await world.get(
-    CANONICAL_ID,
-    '2026-09-28T00:09:30Z',
-  );
+  const afterRevision = await world.get(CANONICAL_ID, '2026-09-28T00:09:30Z');
   assert.equal(afterRevision.states.length, 2);
   assert.deepEqual(
     afterRevision.states.map((item) => item.properties.value),
@@ -155,21 +149,13 @@ test('world.query distinguishes snapshot state from range history', async () => 
 test('world.near uses the latest state at the requested point in time', async () => {
   const world = await fixture();
 
-  const beforeMove = await world.near(
-    [126.9, 37.5],
-    2,
-    '2026-09-28T00:04:59Z',
-  );
+  const beforeMove = await world.near([126.9, 37.5], 2, '2026-09-28T00:04:59Z');
   assert.deepEqual(
     beforeMove.results.map((item) => item.observation.properties.value),
     [1, 8],
   );
 
-  const afterMove = await world.near(
-    [126.9, 37.5],
-    2,
-    '2026-09-28T00:06:00Z',
-  );
+  const afterMove = await world.near([126.9, 37.5], 2, '2026-09-28T00:06:00Z');
   assert.deepEqual(
     afterMove.results.map((item) => item.observation.properties.value),
     [8],
@@ -178,5 +164,8 @@ test('world.near uses the latest state at the requested point in time', async ()
 
 test('world.get rejects ambiguous non-canonical shorthand IDs', async () => {
   const world = await fixture();
-  await assert.rejects(world.get('asset-1'), /canonical_entity_id must be a UUID/);
+  await assert.rejects(
+    world.get('asset-1'),
+    /canonical_entity_id must be a UUID/,
+  );
 });
