@@ -97,6 +97,7 @@ export function createExternalProviderIngestor({
     const baseRun = {
       ingestion_run_id: runId,
       provider_id: providerId,
+      provider: structuredClone(adapter.metadata),
       status: 'RUNNING',
       started_at: startedAt,
       completed_at: null,
