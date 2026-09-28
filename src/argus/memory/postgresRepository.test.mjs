@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { createPostgresWorldMemoryRepository } from './postgresRepository.js';
-import { registerWorldMemoryRepositoryContract } from './worldMemoryContractSuite.mjs';
+import { registerWorldMemoryRepositoryContract } from './worldMemoryContract.test.mjs';
 
 const url = process.env.ARGUS_POSTGRES_TEST_URL;
 
