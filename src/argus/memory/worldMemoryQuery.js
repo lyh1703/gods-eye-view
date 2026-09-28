@@ -2,8 +2,11 @@ import {
   haversineDistanceKm,
   normalizeWorldPoint,
   pointCoordinates,
-  radiusBbox,
 } from '../worldOperations.js';
+import {
+  geometryBbox,
+  geometryBboxesIntersect,
+} from '../spatial/geometry.js';
 import { validateWorldMemoryRepository } from './repository.js';
 
 const UUID_PATTERN =
@@ -413,12 +416,22 @@ export function createWorldMemoryQueryEngine({
       entity_type: entityType,
       observation_type: options.observation_type ?? null,
       to: time.at,
-      bbox,
       order: 'desc',
       limit: candidates,
       time_basis: basis,
     });
-    const states = latestSnapshot(observations, basis).slice(0, limit);
+    const snapshot = latestSnapshot(observations, basis);
+    const states = snapshot
+      .filter((observation) => {
+        if (!bbox) return true;
+        if (!observation.geometry) return false;
+        const observationBbox = geometryBbox(observation.geometry);
+        return (
+          observationBbox != null &&
+          geometryBboxesIntersect(observationBbox, bbox)
+        );
+      })
+      .slice(0, limit);
 
     return {
       mode: 'snapshot',
@@ -474,13 +487,11 @@ export function createWorldMemoryQueryEngine({
     }
 
     const candidates = candidateLimit(limit);
-    const bbox = radiusBbox(point, radiusKm);
     const observations = await memory.queryObservations({
       provider_ids: options.provider_ids,
       entity_type: entityType,
       observation_type: options.observation_type ?? null,
       to: time.at,
-      bbox,
       order: 'desc',
       limit: candidates,
       time_basis: basis,
