@@ -8,6 +8,7 @@ on:
       - 'src/argus/memory/**'
       - 'src/argus/providers/**'
       - 'src/argus/externalProviderIngest*'
+      - 'src/argus/nexusVerifiedQuery*'
       - '.github/workflows/argus-postgis.yml'
   workflow_dispatch:
 
@@ -103,3 +104,8 @@ jobs:
         env:
           ARGUS_POSTGRES_TEST_URL: postgresql://argus:argus@127.0.0.1:5432/argus_test
         run: node --test src/argus/externalProviderIngest.postgres.test.mjs
+
+      - name: Run ARGUS to NEXUS verified-query E2E gate
+        env:
+          ARGUS_POSTGRES_TEST_URL: postgresql://argus:argus@127.0.0.1:5432/argus_test
+        run: node --test src/argus/nexusVerifiedQuery.postgres.test.mjs
