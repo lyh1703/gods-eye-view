@@ -470,7 +470,7 @@ export function createPostgresWorldMemoryRepository({
             ? null
             : JSON.stringify(observation.geometry),
           observation.properties ?? {},
-          observation.freshness_seconds,
+          Math.floor(Number(observation.freshness_seconds)),
           observation.coverage,
           observation.confidence,
           observation.license_class,
