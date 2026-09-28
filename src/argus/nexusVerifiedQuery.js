@@ -1,5 +1,4 @@
-export const ARGUS_NEXUS_QUERY_CONTRACT_ID =
-  'argus-nexus-verified-query-v0.1';
+export const ARGUS_NEXUS_QUERY_CONTRACT_ID = 'argus-nexus-verified-query-v0.1';
 
 const OPERATIONS = new Set(['current', 'history', 'query', 'near']);
 
@@ -106,8 +105,7 @@ function summarizeRun(run, ingestionRunId) {
     degraded,
     started_at: run.started_at ?? null,
     completed_at: run.completed_at ?? null,
-    last_normal_observation_at:
-      metadata.last_normal_observation_at ?? null,
+    last_normal_observation_at: metadata.last_normal_observation_at ?? null,
     retry_count: metadata.retry_count ?? null,
     error: metadata.error ?? null,
   };
@@ -140,10 +138,7 @@ async function referencedRunHealth(world, evidence) {
   let degraded = null;
   if (runs.some((run) => run.degraded === true)) {
     degraded = true;
-  } else if (
-    runs.length > 0 &&
-    runs.every((run) => run.degraded === false)
-  ) {
+  } else if (runs.length > 0 && runs.every((run) => run.degraded === false)) {
     degraded = false;
   }
 
