@@ -43,7 +43,12 @@ jobs:
         run: npm run doctor -- --json
 
       - name: Check adopted formatting
-        run: npm run format:check
+        run: |
+          if ! npm run format:check; then
+            npm run format
+            git --no-pager diff -- src/argus/memory/postgresRepository.js
+            exit 1
+          fi
 
       - name: Check package boundaries
         run: npm run check:boundaries
