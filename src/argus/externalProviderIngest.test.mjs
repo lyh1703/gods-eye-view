@@ -7,7 +7,8 @@ import { createWorldMemoryQueryEngine } from './memory/worldMemoryQuery.js';
 import { createUsgsEarthquakesAdapter } from './providers/usgsEarthquakes.js';
 
 let id = 0;
-const uuid = () => `00000000-0000-4000-8000-${String(++id).padStart(12, '0')}`;
+const uuid = () =>
+  `00000000-0000-4000-8000-${String(++id).padStart(12, '0')}`;
 
 function response(payload, { ok = true, status = 200 } = {}) {
   return { ok, status, json: async () => structuredClone(payload) };
