@@ -209,12 +209,15 @@ test('provider-scoped identity never merges providers without canonical link', a
   assert.equal(unlinked.state.properties.value, 77);
 
   const canonical = await world.get(CANONICAL_ID, '2026-09-28T00:09:00Z');
-  assert.deepEqual(
-    canonical.states.map((item) => item.provider_id).sort(),
-    ['provider-a', 'provider-b'],
-  );
+  assert.deepEqual(canonical.states.map((item) => item.provider_id).sort(), [
+    'provider-a',
+    'provider-b',
+  ]);
   assert.equal(canonical.evidence.conflict_count, 1);
-  assert.equal(canonical.evidence.canonical_validity[0].valid_from != null, true);
+  assert.equal(
+    canonical.evidence.canonical_validity[0].valid_from != null,
+    true,
+  );
   assert.equal(canonical.evidence.canonical_validity[0].valid_to != null, true);
 });
 
@@ -247,17 +250,16 @@ test('world.query combines temporal replay with spatial filtering', async () => 
     t2Area.states.map((item) => item.properties.value).sort((a, b) => a - b),
     [8, 77, 99],
   );
-  assert.equal(t2Area.evidence.observation_ids.includes('obs-t3-correction'), false);
+  assert.equal(
+    t2Area.evidence.observation_ids.includes('obs-t3-correction'),
+    false,
+  );
 });
 
 test('world.near combines radius and time and keeps evidence', async () => {
   const { world } = await fixture();
 
-  const t1 = await world.near(
-    [126.9, 37.5],
-    2,
-    '2026-09-28T00:04:59Z',
-  );
+  const t1 = await world.near([126.9, 37.5], 2, '2026-09-28T00:04:59Z');
   assert.deepEqual(
     t1.results
       .map((item) => item.observation.properties.value)
@@ -265,11 +267,7 @@ test('world.near combines radius and time and keeps evidence', async () => {
     [1, 8, 77],
   );
 
-  const t2 = await world.near(
-    [126.9, 37.5],
-    2,
-    '2026-09-28T00:09:00Z',
-  );
+  const t2 = await world.near([126.9, 37.5], 2, '2026-09-28T00:09:00Z');
   assert.deepEqual(
     t2.results
       .map((item) => item.observation.properties.value)

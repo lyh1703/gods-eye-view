@@ -71,17 +71,13 @@ function stateRecency(left, right, basis) {
     observationTime(left, 'ingested') - observationTime(right, 'ingested');
   if (ingested !== 0) return ingested;
 
-  return (
-    observationTime(left, 'received') - observationTime(right, 'received')
-  );
+  return observationTime(left, 'received') - observationTime(right, 'received');
 }
 
 function canonicalValidityIncludes(observation, at) {
   if (!observation?.canonical_entity_id) return true;
   const atMs = Date.parse(at);
-  const validFrom = Date.parse(
-    observation.canonical_entity_valid_from ?? '',
-  );
+  const validFrom = Date.parse(observation.canonical_entity_valid_from ?? '');
   const validTo = Date.parse(observation.canonical_entity_valid_to ?? '');
 
   if (Number.isFinite(validFrom) && atMs < validFrom) return false;
@@ -102,7 +98,10 @@ function latestSnapshot(observations, basis, asOf = null) {
   const latest = new Map();
 
   for (const observation of eligible) {
-    if (observation.observation_id && superseded.has(observation.observation_id)) {
+    if (
+      observation.observation_id &&
+      superseded.has(observation.observation_id)
+    ) {
       continue;
     }
     const key = providerScopedKey(observation);

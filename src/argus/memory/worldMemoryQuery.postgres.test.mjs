@@ -153,8 +153,7 @@ if (!url) {
         ingestedAt: '2026-09-28T00:06:30Z',
         coordinates: [127.5, 37.5],
         value: 2,
-        supersedesObservationId:
-          '00000000-0000-4000-8000-00000000b401',
+        supersedesObservationId: '00000000-0000-4000-8000-00000000b401',
       }),
       make({
         id: '00000000-0000-4000-8000-00000000b405',
@@ -165,8 +164,7 @@ if (!url) {
         ingestedAt: '2026-09-28T00:10:30Z',
         coordinates: [127.5, 37.5],
         value: 3,
-        supersedesObservationId:
-          '00000000-0000-4000-8000-00000000b402',
+        supersedesObservationId: '00000000-0000-4000-8000-00000000b402',
       }),
       make({
         id: '00000000-0000-4000-8000-00000000b403',
@@ -251,14 +249,11 @@ if (!url) {
   test('Postgres canonical replay only combines explicitly linked providers', async () => {
     const { world } = await seed();
 
-    const canonical = await world.get(
-      CANONICAL_ID,
-      '2026-09-28T00:09:00Z',
-    );
-    assert.deepEqual(
-      canonical.states.map((item) => item.provider_id).sort(),
-      ['provider-a', 'provider-b'],
-    );
+    const canonical = await world.get(CANONICAL_ID, '2026-09-28T00:09:00Z');
+    assert.deepEqual(canonical.states.map((item) => item.provider_id).sort(), [
+      'provider-a',
+      'provider-b',
+    ]);
     assert.equal(canonical.evidence.conflict_count, 1);
     assert.equal(
       canonical.evidence.canonical_validity[0].valid_from,
@@ -269,10 +264,7 @@ if (!url) {
       '2026-09-28T00:30:00.000Z',
     );
 
-    const expired = await world.get(
-      CANONICAL_ID,
-      '2026-09-28T00:31:00Z',
-    );
+    const expired = await world.get(CANONICAL_ID, '2026-09-28T00:31:00Z');
     assert.equal(expired.found, false);
   });
 
@@ -297,11 +289,7 @@ if (!url) {
       true,
     );
 
-    const near = await world.near(
-      [126.9, 37.5],
-      2,
-      '2026-09-28T00:09:00Z',
-    );
+    const near = await world.near([126.9, 37.5], 2, '2026-09-28T00:09:00Z');
     assert.deepEqual(
       near.results
         .map((item) => item.observation.properties.value)
