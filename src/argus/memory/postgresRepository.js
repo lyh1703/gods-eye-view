@@ -192,6 +192,7 @@ function buildObservationQuery(
     limit = 100,
     order = 'desc',
     time_basis = 'observed',
+    known_at = null,
   } = {},
 ) {
   const params = [];
@@ -246,6 +247,7 @@ function buildObservationQuery(
   const timeColumn = timeColumnFor(time_basis);
   const fromIso = normalizeTimestamp(from, 'from');
   const toIso = normalizeTimestamp(to, 'to');
+  const knownAtIso = normalizeTimestamp(known_at, 'known_at');
   if (fromIso && toIso && Date.parse(fromIso) > Date.parse(toIso)) {
     throw new RangeError('from must not be after to');
   }
@@ -254,6 +256,9 @@ function buildObservationQuery(
   }
   if (toIso) {
     conditions.push(`${timeColumn} <= ${add(toIso)}::timestamptz`);
+  }
+  if (knownAtIso) {
+    conditions.push(`o.ingested_at <= ${add(knownAtIso)}::timestamptz`);
   }
 
   const normalizedBbox = normalizeBbox(bbox);
@@ -408,7 +413,7 @@ export function createPostgresWorldMemoryRepository({
           observation.timestamp_observed,
           observation.effective_at ?? observation.timestamp_observed,
           observation.timestamp_received,
-          ingestedAt,
+          observation.ingested_at ?? ingestedAt,
           observation.geometry == null
             ? null
             : JSON.stringify(observation.geometry),
@@ -536,6 +541,7 @@ export function createPostgresWorldMemoryRepository({
     to = null,
     limit = 100,
     time_basis = 'observed',
+    known_at = null,
   } = {}) {
     const [longitude, latitude] = normalizeWorldPoint(center);
     const radiusKm = Number(radius_km);
@@ -552,6 +558,7 @@ export function createPostgresWorldMemoryRepository({
       limit: 2147483647,
       order: 'desc',
       time_basis,
+      known_at,
     });
 
     const values = base.values.slice(0, -1);
