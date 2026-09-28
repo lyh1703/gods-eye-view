@@ -107,13 +107,14 @@ const TIME_BASIS_FIELDS = Object.freeze({
   observed: 'timestamp_observed',
   effective: 'effective_at',
   received: 'timestamp_received',
+  ingested: 'ingested_at',
 });
 
 function normalizeTimeBasis(value) {
   const basis = value ?? 'observed';
   if (!Object.hasOwn(TIME_BASIS_FIELDS, basis)) {
     throw new TypeError(
-      "time_basis must be 'observed', 'effective', or 'received'",
+      "time_basis must be 'observed', 'effective', 'received', or 'ingested'",
     );
   }
   return basis;
@@ -140,10 +141,12 @@ function normalizeObservationQuery({
   limit = 100,
   order = 'desc',
   time_basis = 'observed',
+  known_at = null,
 } = {}) {
   const basis = normalizeTimeBasis(time_basis);
   const fromIso = normalizeOptionalTimestamp(from, 'from');
   const toIso = normalizeOptionalTimestamp(to, 'to');
+  const knownAtIso = normalizeOptionalTimestamp(known_at, 'known_at');
   const fromMs = fromIso ? Date.parse(fromIso) : -Infinity;
   const toMs = toIso ? Date.parse(toIso) : Infinity;
   if (fromMs > toMs) {
@@ -170,6 +173,7 @@ function normalizeObservationQuery({
         : requireNonEmptyString(observation_type, 'observation_type'),
     fromMs,
     toMs,
+    knownAtMs: knownAtIso ? Date.parse(knownAtIso) : Infinity,
     bbox: normalizeBbox(bbox),
     limit: normalizeLimit(limit),
     order: normalizeOrder(order),
@@ -208,6 +212,9 @@ function observationMatches(record, query) {
   const time = observationTimeMs(observation, query.timeBasis);
   if (time < query.fromMs || time > query.toMs) return false;
 
+  const ingested = observationTimeMs(observation, 'ingested');
+  if (ingested > query.knownAtMs) return false;
+
   if (query.bbox) {
     if (!observation.geometry) return false;
     const observationBbox = geometryBbox(observation.geometry);
@@ -227,6 +234,14 @@ function compareRecords(left, right, order, timeBasis) {
     observationTimeMs(left.observation, timeBasis) -
     observationTimeMs(right.observation, timeBasis);
   if (delta !== 0) return order === 'asc' ? delta : -delta;
+
+  const ingestedDelta =
+    observationTimeMs(left.observation, 'ingested') -
+    observationTimeMs(right.observation, 'ingested');
+  if (ingestedDelta !== 0) {
+    return order === 'asc' ? ingestedDelta : -ingestedDelta;
+  }
+
   return order === 'asc'
     ? left.sequence - right.sequence
     : right.sequence - left.sequence;
@@ -313,7 +328,10 @@ export function createInMemoryWorldMemoryRepository({
     const pending = validated.map((observation) => ({
       sequence: ++sequence,
       recorded_at: recordedAt,
-      observation,
+      observation: {
+        ...observation,
+        ingested_at: observation.ingested_at ?? recordedAt,
+      },
     }));
 
     observationRecords.push(...pending);
@@ -363,6 +381,7 @@ export function createInMemoryWorldMemoryRepository({
     to = null,
     limit = 100,
     time_basis = 'observed',
+    known_at = null,
   } = {}) {
     const normalizedCenter = normalizeWorldPoint(center);
     const radiusKm = Number(radius_km);
@@ -379,6 +398,7 @@ export function createInMemoryWorldMemoryRepository({
       limit: Number.MAX_SAFE_INTEGER,
       order: 'desc',
       time_basis,
+      known_at,
     });
 
     return candidates

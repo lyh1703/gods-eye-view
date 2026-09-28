@@ -48,9 +48,9 @@ function normalizeOrder(value) {
 
 function normalizeTimeBasis(value) {
   const basis = value ?? 'observed';
-  if (!['observed', 'effective', 'received'].includes(basis)) {
+  if (!['observed', 'effective', 'received', 'ingested'].includes(basis)) {
     throw new TypeError(
-      "time_basis must be 'observed', 'effective', or 'received'",
+      "time_basis must be 'observed', 'effective', 'received', or 'ingested'",
     );
   }
   return basis;
@@ -61,6 +61,7 @@ function timeColumnFor(basis) {
     observed: 'o.observed_at',
     effective: 'o.effective_at',
     received: 'o.received_at',
+    ingested: 'o.ingested_at',
   }[normalizeTimeBasis(basis)];
 }
 
@@ -126,6 +127,8 @@ function mapObservationRow(row) {
     source_artifact_id: row.source_artifact_id,
     supersedes_observation_id: row.supersedes_observation_id,
     content_hash: row.content_hash,
+    canonical_entity_valid_from: toIso(row.canonical_entity_valid_from),
+    canonical_entity_valid_to: toIso(row.canonical_entity_valid_to),
     raw_reference: row.source_artifact_id ?? null,
   };
 }
@@ -159,7 +162,9 @@ function observationColumns() {
     o.ingestion_run_id::text,
     o.source_artifact_id::text,
     o.supersedes_observation_id::text,
-    o.content_hash
+    o.content_hash,
+    e.valid_from AS canonical_entity_valid_from,
+    e.valid_to AS canonical_entity_valid_to
   `;
 }
 
@@ -168,6 +173,8 @@ function observationSelect(schema) {
     SELECT
       ${observationColumns()}
     FROM ${schema}.observations o
+    LEFT JOIN ${schema}.entities e
+      ON e.entity_id = o.canonical_entity_id
   `;
 }
 
@@ -185,6 +192,7 @@ function buildObservationQuery(
     limit = 100,
     order = 'desc',
     time_basis = 'observed',
+    known_at = null,
   } = {},
 ) {
   const params = [];
@@ -239,6 +247,7 @@ function buildObservationQuery(
   const timeColumn = timeColumnFor(time_basis);
   const fromIso = normalizeTimestamp(from, 'from');
   const toIso = normalizeTimestamp(to, 'to');
+  const knownAtIso = normalizeTimestamp(known_at, 'known_at');
   if (fromIso && toIso && Date.parse(fromIso) > Date.parse(toIso)) {
     throw new RangeError('from must not be after to');
   }
@@ -247,6 +256,9 @@ function buildObservationQuery(
   }
   if (toIso) {
     conditions.push(`${timeColumn} <= ${add(toIso)}::timestamptz`);
+  }
+  if (knownAtIso) {
+    conditions.push(`o.ingested_at <= ${add(knownAtIso)}::timestamptz`);
   }
 
   const normalizedBbox = normalizeBbox(bbox);
@@ -273,7 +285,10 @@ function buildObservationQuery(
     text: `
       ${observationSelect(schema)}
       WHERE ${conditions.join(' AND ')}
-      ORDER BY ${timeColumn} ${normalizedOrder}, o.created_at ${normalizedOrder}
+      ORDER BY
+        ${timeColumn} ${normalizedOrder},
+        o.ingested_at ${normalizedOrder},
+        o.created_at ${normalizedOrder}
       LIMIT ${add(normalizedLimit)}::integer
     `,
     values: params,
@@ -401,7 +416,7 @@ export function createPostgresWorldMemoryRepository({
           observation.timestamp_observed,
           observation.effective_at ?? observation.timestamp_observed,
           observation.timestamp_received,
-          ingestedAt,
+          observation.ingested_at ?? ingestedAt,
           observation.geometry == null
             ? null
             : JSON.stringify(observation.geometry),
@@ -529,6 +544,7 @@ export function createPostgresWorldMemoryRepository({
     to = null,
     limit = 100,
     time_basis = 'observed',
+    known_at = null,
   } = {}) {
     const [longitude, latitude] = normalizeWorldPoint(center);
     const radiusKm = Number(radius_km);
@@ -545,6 +561,7 @@ export function createPostgresWorldMemoryRepository({
       limit: 2147483647,
       order: 'desc',
       time_basis,
+      known_at,
     });
 
     const values = base.values.slice(0, -1);
@@ -572,6 +589,8 @@ export function createPostgresWorldMemoryRepository({
           ST_Distance(o.geometry::geography, ${point}::geography) / 1000.0
             AS distance_km
         FROM ${safeSchema}.observations o
+        LEFT JOIN ${safeSchema}.entities e
+          ON e.entity_id = o.canonical_entity_id
         WHERE ${whereMatch[1]}
           AND o.geometry IS NOT NULL
           AND ST_DWithin(

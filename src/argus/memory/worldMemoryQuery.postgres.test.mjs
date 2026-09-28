@@ -57,7 +57,8 @@ if (!url) {
           adapter_status
         ) VALUES
           ('provider-a', 'test', 'global', 'test', false, false, 'test-only', 'test'),
-          ('provider-b', 'test', 'global', 'test', false, false, 'test-only', 'test')
+          ('provider-b', 'test', 'global', 'test', false, false, 'test-only', 'test'),
+          ('provider-c', 'test', 'global', 'test', false, false, 'test-only', 'test')
       `,
     );
     await pool.query(
@@ -65,8 +66,16 @@ if (!url) {
         INSERT INTO argus_world.entities (
           entity_id,
           entity_type,
-          canonical_name
-        ) VALUES ($1::uuid, 'asset', 'Temporal Gate Asset')
+          canonical_name,
+          valid_from,
+          valid_to
+        ) VALUES (
+          $1::uuid,
+          'asset',
+          'Temporal Gate Asset',
+          '2026-09-28T00:00:00Z',
+          '2026-09-28T00:30:00Z'
+        )
       `,
       [CANONICAL_ID],
     );
@@ -75,18 +84,19 @@ if (!url) {
       db: pool,
       now: () => new Date('2026-09-28T00:20:00Z'),
     });
-    await repository.saveIngestionRun({
-      ingestion_run_id: RUN_A,
-      provider_id: 'provider-a',
-      started_at: '2026-09-28T00:00:00Z',
-      status: 'RUNNING',
-    });
-    await repository.saveIngestionRun({
-      ingestion_run_id: RUN_B,
-      provider_id: 'provider-b',
-      started_at: '2026-09-28T00:00:00Z',
-      status: 'RUNNING',
-    });
+
+    for (const [runId, providerId] of [
+      [RUN_A, 'provider-a'],
+      [RUN_B, 'provider-b'],
+      ['00000000-0000-4000-8000-00000000a403', 'provider-c'],
+    ]) {
+      await repository.saveIngestionRun({
+        ingestion_run_id: runId,
+        provider_id: providerId,
+        started_at: '2026-09-28T00:00:00Z',
+        status: 'RUNNING',
+      });
+    }
 
     const make = ({
       id,
@@ -94,10 +104,12 @@ if (!url) {
       runId,
       entityId = 'asset-1',
       observedAt,
-      effectiveAt,
+      effectiveAt = observedAt,
+      ingestedAt = observedAt,
       coordinates,
       value,
       canonicalEntityId = CANONICAL_ID,
+      supersedesObservationId = null,
     }) =>
       createObservationEnvelope({
         observation_id: id,
@@ -107,8 +119,9 @@ if (!url) {
         canonical_entity_id: canonicalEntityId,
         observation_type: 'state',
         timestamp_observed: observedAt,
-        effective_at: effectiveAt ?? observedAt,
+        effective_at: effectiveAt,
         timestamp_received: observedAt,
+        ingested_at: ingestedAt,
         geometry: { type: 'Point', coordinates },
         properties: { value },
         source_url: 'https://example.test/' + providerId + '/' + entityId,
@@ -118,6 +131,7 @@ if (!url) {
         retention_policy: 'test-only',
         rate_limit_class: 'test',
         ingestion_run_id: runId,
+        supersedes_observation_id: supersedesObservationId,
       });
 
     await repository.appendObservations([
@@ -126,6 +140,7 @@ if (!url) {
         providerId: 'provider-a',
         runId: RUN_A,
         observedAt: '2026-09-28T00:00:00Z',
+        ingestedAt: '2026-09-28T00:00:30Z',
         coordinates: [126.9005, 37.5],
         value: 1,
       }),
@@ -133,18 +148,43 @@ if (!url) {
         id: '00000000-0000-4000-8000-00000000b402',
         providerId: 'provider-a',
         runId: RUN_A,
-        observedAt: '2026-09-28T00:10:00Z',
+        observedAt: '2026-09-28T00:06:00Z',
         effectiveAt: '2026-09-28T00:05:00Z',
+        ingestedAt: '2026-09-28T00:06:30Z',
         coordinates: [127.5, 37.5],
         value: 2,
+        supersedesObservationId: '00000000-0000-4000-8000-00000000b401',
+      }),
+      make({
+        id: '00000000-0000-4000-8000-00000000b405',
+        providerId: 'provider-a',
+        runId: RUN_A,
+        observedAt: '2026-09-28T00:10:00Z',
+        effectiveAt: '2026-09-28T00:05:00Z',
+        ingestedAt: '2026-09-28T00:10:30Z',
+        coordinates: [127.5, 37.5],
+        value: 3,
+        supersedesObservationId: '00000000-0000-4000-8000-00000000b402',
       }),
       make({
         id: '00000000-0000-4000-8000-00000000b403',
         providerId: 'provider-b',
         runId: RUN_B,
-        observedAt: '2026-09-28T00:09:00Z',
+        observedAt: '2026-09-28T00:07:00Z',
+        effectiveAt: '2026-09-28T00:05:00Z',
+        ingestedAt: '2026-09-28T00:07:30Z',
         coordinates: [126.91, 37.5],
         value: 99,
+      }),
+      make({
+        id: '00000000-0000-4000-8000-00000000b406',
+        providerId: 'provider-c',
+        runId: '00000000-0000-4000-8000-00000000a403',
+        observedAt: '2026-09-28T00:04:00Z',
+        ingestedAt: '2026-09-28T00:04:30Z',
+        coordinates: [126.906, 37.5],
+        value: 77,
+        canonicalEntityId: null,
       }),
       make({
         id: '00000000-0000-4000-8000-00000000b404',
@@ -152,6 +192,7 @@ if (!url) {
         runId: RUN_A,
         entityId: 'asset-2',
         observedAt: '2026-09-28T00:04:00Z',
+        ingestedAt: '2026-09-28T00:04:30Z',
         coordinates: [126.905, 37.5],
         value: 8,
         canonicalEntityId: null,
@@ -167,51 +208,131 @@ if (!url) {
     };
   }
 
-  test('Postgres world.get replays point-in-time state and explicit conflicts', async () => {
+  test('Postgres replay preserves T1 T2 T3 and blocks future corrections', async () => {
     const { world } = await seed();
 
-    const before = await world.get(CANONICAL_ID, '2026-09-28T00:04:59Z');
-    assert.equal(before.state.properties.value, 1);
-
-    const after = await world.get(CANONICAL_ID, '2026-09-28T00:09:30Z');
-    assert.deepEqual(
-      after.states.map((item) => item.properties.value),
-      [99, 2],
+    const t1 = await world.get(
+      {
+        entity_type: 'asset',
+        entity_id: 'asset-1',
+        provider_ids: ['provider-a'],
+      },
+      '2026-09-28T00:04:59Z',
     );
-    assert.equal(after.evidence.conflict_count, 1);
+    assert.equal(t1.state.properties.value, 1);
+
+    const t2 = await world.get(
+      {
+        entity_type: 'asset',
+        entity_id: 'asset-1',
+        provider_ids: ['provider-a'],
+      },
+      '2026-09-28T00:07:00Z',
+    );
+    assert.equal(t2.state.properties.value, 2);
+    assert.equal(
+      t2.evidence.observation_ids.includes(
+        '00000000-0000-4000-8000-00000000b405',
+      ),
+      false,
+    );
+
+    const current = await world.get({
+      entity_type: 'asset',
+      entity_id: 'asset-1',
+      provider_ids: ['provider-a'],
+    });
+    assert.equal(current.state.properties.value, 3);
+    assert.equal(current.evidence.supersessions.length, 1);
   });
 
-  test('Postgres world.query and world.near reproduce historical spatial state', async () => {
+  test('Postgres canonical replay only combines explicitly linked providers', async () => {
+    const { world } = await seed();
+
+    const canonical = await world.get(CANONICAL_ID, '2026-09-28T00:09:00Z');
+    assert.deepEqual(canonical.states.map((item) => item.provider_id).sort(), [
+      'provider-a',
+      'provider-b',
+    ]);
+    assert.equal(canonical.evidence.conflict_count, 1);
+    assert.equal(
+      canonical.evidence.canonical_validity[0].valid_from,
+      '2026-09-28T00:00:00.000Z',
+    );
+    assert.equal(
+      canonical.evidence.canonical_validity[0].valid_to,
+      '2026-09-28T00:30:00.000Z',
+    );
+
+    const expired = await world.get(CANONICAL_ID, '2026-09-28T00:31:00Z');
+    assert.equal(expired.found, false);
+  });
+
+  test('Postgres temporal spatial queries retain provenance', async () => {
     const { world } = await seed();
 
     const snapshot = await world.query(
-      [126.8, 37.4, 128.0, 37.6],
-      '2026-09-28T00:06:00Z',
+      [126.8, 37.4, 127.0, 37.6],
+      '2026-09-28T00:09:00Z',
       'asset',
     );
     assert.deepEqual(
-      snapshot.states.map((item) => item.properties.value),
-      [2, 8],
+      snapshot.states
+        .map((item) => item.properties.value)
+        .sort((a, b) => a - b),
+      [8, 77, 99],
+    );
+    assert.equal(
+      snapshot.evidence.observation_ids.includes(
+        '00000000-0000-4000-8000-00000000b403',
+      ),
+      true,
     );
 
-    const beforeMove = await world.near(
-      [126.9, 37.5],
-      2,
-      '2026-09-28T00:04:59Z',
+    const near = await world.near([126.9, 37.5], 2, '2026-09-28T00:09:00Z');
+    assert.deepEqual(
+      near.results
+        .map((item) => item.observation.properties.value)
+        .sort((a, b) => a - b),
+      [8, 77, 99],
+    );
+    assert.equal(near.evidence.provider_ids.includes('provider-b'), true);
+  });
+
+  test('Postgres history and ingested-time basis remain explicit', async () => {
+    const { world } = await seed();
+
+    const history = await world.history(
+      {
+        entity_type: 'asset',
+        entity_id: 'asset-1',
+        provider_ids: ['provider-a'],
+      },
+      '2026-09-28T00:00:00Z',
+      '2026-09-28T00:12:00Z',
     );
     assert.deepEqual(
-      beforeMove.results.map((item) => item.observation.properties.value),
-      [1, 8],
+      history.observations.map((item) => item.properties.value),
+      [1, 2, 3],
+    );
+    assert.equal(
+      history.evidence.timestamps.ingested.max,
+      '2026-09-28T00:10:30.000Z',
     );
 
-    const afterMove = await world.near(
-      [126.9, 37.5],
-      2,
+    const ingestionHistory = await world.history(
+      {
+        entity_type: 'asset',
+        entity_id: 'asset-1',
+        provider_ids: ['provider-a'],
+      },
       '2026-09-28T00:06:00Z',
+      '2026-09-28T00:11:00Z',
+      { time_basis: 'ingested' },
     );
     assert.deepEqual(
-      afterMove.results.map((item) => item.observation.properties.value),
-      [8],
+      ingestionHistory.observations.map((item) => item.properties.value),
+      [2, 3],
     );
   });
 
