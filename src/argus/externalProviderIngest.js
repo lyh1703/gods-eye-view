@@ -67,7 +67,9 @@ export function createExternalProviderIngestor({
 
   async function ingest(adapter, query = {}) {
     if (!adapter?.metadata?.provider_id || typeof adapter.query !== 'function') {
-      throw new TypeError('adapter metadata.provider_id and query() are required');
+      throw new TypeError(
+        'adapter metadata.provider_id and query() are required',
+      );
     }
 
     const providerId = adapter.metadata.provider_id;
