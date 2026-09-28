@@ -84,7 +84,9 @@ export function createExternalProviderIngestor({
 
   async function ingest(adapter, query = {}) {
     if (!adapter?.metadata?.provider_id || typeof adapter.query !== 'function') {
-      throw new TypeError('adapter metadata.provider_id and query() are required');
+      throw new TypeError(
+        'adapter metadata.provider_id and query() are required',
+      );
     }
 
     const providerId = adapter.metadata.provider_id;
@@ -124,10 +126,7 @@ export function createExternalProviderIngestor({
           }
           break;
         } catch (error) {
-          if (
-            attempt >= attemptLimit ||
-            !isRetryableProviderError(error)
-          ) {
+          if (attempt >= attemptLimit || !isRetryableProviderError(error)) {
             throw error;
           }
           if (retryDelay > 0) {
