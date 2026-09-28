@@ -34,9 +34,9 @@ function toIso(value, field) {
 
 function normalizeTimeBasis(value) {
   const basis = value ?? 'effective';
-  if (!['observed', 'effective', 'received'].includes(basis)) {
+  if (!['observed', 'effective', 'received', 'ingested'].includes(basis)) {
     throw new TypeError(
-      "time_basis must be 'observed', 'effective', or 'received'",
+      "time_basis must be 'observed', 'effective', 'received', or 'ingested'",
     );
   }
   return basis;
@@ -47,6 +47,7 @@ function observationTime(observation, basis) {
     observed: 'timestamp_observed',
     effective: 'effective_at',
     received: 'timestamp_received',
+    ingested: 'ingested_at',
   }[basis];
   return Date.parse(
     observation?.[field] ??
@@ -62,21 +63,57 @@ function providerScopedKey(observation) {
   ].join(':');
 }
 
-function latestSnapshot(observations, basis) {
+function stateRecency(left, right, basis) {
+  const primary = observationTime(left, basis) - observationTime(right, basis);
+  if (primary !== 0) return primary;
+
+  const ingested =
+    observationTime(left, 'ingested') - observationTime(right, 'ingested');
+  if (ingested !== 0) return ingested;
+
+  return (
+    observationTime(left, 'received') - observationTime(right, 'received')
+  );
+}
+
+function canonicalValidityIncludes(observation, at) {
+  if (!observation?.canonical_entity_id) return true;
+  const atMs = Date.parse(at);
+  const validFrom = Date.parse(
+    observation.canonical_entity_valid_from ?? '',
+  );
+  const validTo = Date.parse(observation.canonical_entity_valid_to ?? '');
+
+  if (Number.isFinite(validFrom) && atMs < validFrom) return false;
+  if (Number.isFinite(validTo) && atMs >= validTo) return false;
+  return true;
+}
+
+function latestSnapshot(observations, basis, asOf = null) {
+  const eligible = observations.filter(
+    (observation) =>
+      asOf == null || canonicalValidityIncludes(observation, asOf),
+  );
+  const superseded = new Set(
+    eligible
+      .map((observation) => observation.supersedes_observation_id)
+      .filter(Boolean),
+  );
   const latest = new Map();
-  for (const observation of observations) {
+
+  for (const observation of eligible) {
+    if (observation.observation_id && superseded.has(observation.observation_id)) {
+      continue;
+    }
     const key = providerScopedKey(observation);
     const previous = latest.get(key);
-    if (
-      !previous ||
-      observationTime(observation, basis) >= observationTime(previous, basis)
-    ) {
+    if (!previous || stateRecency(observation, previous, basis) > 0) {
       latest.set(key, observation);
     }
   }
-  return [...latest.values()].sort(
-    (left, right) =>
-      observationTime(right, basis) - observationTime(left, basis),
+
+  return [...latest.values()].sort((left, right) =>
+    stateRecency(right, left, basis),
   );
 }
 
@@ -102,8 +139,27 @@ function stateFingerprint(observation) {
   );
 }
 
+function timestampBounds(observations, field, fallback = null) {
+  const values = observations
+    .map((observation) => observation?.[field] ?? fallback?.(observation))
+    .map((value) => Date.parse(value ?? ''))
+    .filter(Number.isFinite)
+    .sort((left, right) => left - right);
+
+  if (values.length === 0) return { min: null, max: null };
+  return {
+    min: new Date(values[0]).toISOString(),
+    max: new Date(values.at(-1)).toISOString(),
+  };
+}
+
 function evidenceStatus(observations, asOf, basis) {
   const providerIds = [...new Set(observations.map((item) => item.provider_id))]
+    .filter(Boolean)
+    .sort();
+  const observationIds = [
+    ...new Set(observations.map((item) => item.observation_id)),
+  ]
     .filter(Boolean)
     .sort();
   const ingestionRunIds = [
@@ -111,9 +167,27 @@ function evidenceStatus(observations, asOf, basis) {
   ]
     .filter(Boolean)
     .sort();
+  const sourceArtifactIds = [
+    ...new Set(observations.map((item) => item.source_artifact_id)),
+  ]
+    .filter(Boolean)
+    .sort();
   const sourceUrls = [...new Set(observations.map((item) => item.source_url))]
     .filter(Boolean)
     .sort();
+  const supersessions = observations
+    .filter((item) => item.supersedes_observation_id)
+    .map((item) => ({
+      observation_id: item.observation_id ?? null,
+      supersedes_observation_id: item.supersedes_observation_id,
+    }));
+  const canonicalValidity = observations
+    .filter((item) => item.canonical_entity_id)
+    .map((item) => ({
+      canonical_entity_id: item.canonical_entity_id,
+      valid_from: item.canonical_entity_valid_from ?? null,
+      valid_to: item.canonical_entity_valid_to ?? null,
+    }));
 
   const latestTime = observations.reduce((latest, observation) => {
     const timestamp = observationTime(observation, basis);
@@ -153,8 +227,22 @@ function evidenceStatus(observations, asOf, basis) {
 
   return {
     provider_ids: providerIds,
+    observation_ids: observationIds,
     ingestion_run_ids: ingestionRunIds,
+    source_artifact_ids: sourceArtifactIds,
     source_urls: sourceUrls,
+    timestamps: {
+      observed: timestampBounds(observations, 'timestamp_observed'),
+      effective: timestampBounds(
+        observations,
+        'effective_at',
+        (item) => item.timestamp_observed,
+      ),
+      received: timestampBounds(observations, 'timestamp_received'),
+      ingested: timestampBounds(observations, 'ingested_at'),
+    },
+    canonical_validity: canonicalValidity,
+    supersessions,
     staleness_seconds: stalenessSeconds,
     conflicts,
     conflict_count: conflicts.length,
@@ -322,8 +410,9 @@ export function createWorldMemoryQueryEngine({
       order: 'desc',
       limit,
       time_basis: basis,
+      known_at: asOf,
     });
-    const states = latestSnapshot(history, basis);
+    const states = latestSnapshot(history, basis, asOf);
 
     return {
       as_of: asOf,
@@ -359,6 +448,7 @@ export function createWorldMemoryQueryEngine({
       order: options.order ?? 'asc',
       limit: normalizeLimit(options.limit, 1000),
       time_basis: basis,
+      known_at: to ?? now().toISOString(),
     });
 
     return {
@@ -391,6 +481,7 @@ export function createWorldMemoryQueryEngine({
         order: options.order ?? 'asc',
         limit,
         time_basis: basis,
+        known_at: time.end ?? now().toISOString(),
       });
       return {
         mode: 'history',
@@ -416,8 +507,9 @@ export function createWorldMemoryQueryEngine({
       order: 'desc',
       limit: candidates,
       time_basis: basis,
+      known_at: time.at,
     });
-    const snapshot = latestSnapshot(observations, basis);
+    const snapshot = latestSnapshot(observations, basis, time.at);
     const states = snapshot
       .filter((observation) => {
         if (!bbox) return true;
@@ -466,6 +558,7 @@ export function createWorldMemoryQueryEngine({
         to: time.end,
         limit,
         time_basis: basis,
+        known_at: time.end ?? now().toISOString(),
       });
       return {
         mode: 'history',
@@ -492,8 +585,9 @@ export function createWorldMemoryQueryEngine({
       order: 'desc',
       limit: candidates,
       time_basis: basis,
+      known_at: time.at,
     });
-    const snapshot = latestSnapshot(observations, basis);
+    const snapshot = latestSnapshot(observations, basis, time.at);
     const results = snapshot
       .map((observation) => {
         const coordinates = pointCoordinates(observation);
