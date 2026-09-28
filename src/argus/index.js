@@ -1,4 +1,8 @@
 export {
+  ARGUS_NEXUS_QUERY_CONTRACT_ID,
+  createNexusVerifiedQueryAdapter,
+} from './nexusVerifiedQuery.js';
+export {
   classifyObservationFreshness,
   createExternalProviderIngestor,
 } from './externalProviderIngest.js';
