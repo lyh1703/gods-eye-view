@@ -184,7 +184,9 @@ function buildObservationQuery(
     }
   }
   if (entity_type != null) {
-    conditions.push(`o.entity_type = ${add(requireString(entity_type, 'entity_type'))}`);
+    conditions.push(
+      `o.entity_type = ${add(requireString(entity_type, 'entity_type'))}`,
+    );
   }
   if (provider_entity_id != null) {
     conditions.push(
@@ -343,11 +345,9 @@ export function createPostgresWorldMemoryRepository({
       };
     }
 
-    const ingestedAt = normalizeTimestamp(
-      recorded_at ?? now(),
-      'recorded_at',
-      { required: true },
-    );
+    const ingestedAt = normalizeTimestamp(recorded_at ?? now(), 'recorded_at', {
+      required: true,
+    });
 
     return withTransaction(db, async (client) => {
       const observationIds = [];

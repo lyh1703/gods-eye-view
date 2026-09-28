@@ -54,35 +54,38 @@ async function prepare(context) {
 }
 
 export function registerWorldMemoryRepositoryContract(label, makeContext) {
-  test(label + ' appends and queries evidence in observed-time order', async () => {
-    const context = await makeContext();
-    try {
-      await prepare(context);
-      const result = await context.repository.appendObservations([
-        observation({
-          observationId: '00000000-0000-4000-8000-00000000b001',
-          observedAt: '2026-09-28T00:00:00Z',
-          value: 1,
-        }),
-        observation({
-          observationId: '00000000-0000-4000-8000-00000000b002',
-          observedAt: '2026-09-28T00:01:00Z',
-          value: 2,
-        }),
-      ]);
-      assert.equal(result.inserted, 2);
+  test(
+    label + ' appends and queries evidence in observed-time order',
+    async () => {
+      const context = await makeContext();
+      try {
+        await prepare(context);
+        const result = await context.repository.appendObservations([
+          observation({
+            observationId: '00000000-0000-4000-8000-00000000b001',
+            observedAt: '2026-09-28T00:00:00Z',
+            value: 1,
+          }),
+          observation({
+            observationId: '00000000-0000-4000-8000-00000000b002',
+            observedAt: '2026-09-28T00:01:00Z',
+            value: 2,
+          }),
+        ]);
+        assert.equal(result.inserted, 2);
 
-      const rows = await context.repository.queryObservations({
-        order: 'asc',
-      });
-      assert.deepEqual(
-        rows.map((item) => item.properties.value),
-        [1, 2],
-      );
-    } finally {
-      await context.cleanup?.();
-    }
-  });
+        const rows = await context.repository.queryObservations({
+          order: 'asc',
+        });
+        assert.deepEqual(
+          rows.map((item) => item.properties.value),
+          [1, 2],
+        );
+      } finally {
+        await context.cleanup?.();
+      }
+    },
+  );
 
   test(label + ' rejects an invalid batch before partial append', async () => {
     const context = await makeContext();
@@ -124,8 +127,7 @@ export function registerWorldMemoryRepositoryContract(label, makeContext) {
         observedAt: '2026-09-28T00:01:00Z',
         value: 8,
       });
-      providerB.ingestion_run_id =
-        '00000000-0000-4000-8000-00000000a002';
+      providerB.ingestion_run_id = '00000000-0000-4000-8000-00000000a002';
 
       await context.repository.appendObservations([
         observation({

@@ -7,9 +7,13 @@ import { registerWorldMemoryRepositoryContract } from './worldMemoryContractSuit
 const url = process.env.ARGUS_POSTGRES_TEST_URL;
 
 if (!url) {
-  test('PostgresWorldMemory integration requires ARGUS_POSTGRES_TEST_URL', {
-    skip: true,
-  }, () => {});
+  test(
+    'PostgresWorldMemory integration requires ARGUS_POSTGRES_TEST_URL',
+    {
+      skip: true,
+    },
+    () => {},
+  );
 } else {
   const { Pool } = await import('pg');
   const pool = new Pool({ connectionString: url });
@@ -168,11 +172,7 @@ if (!url) {
     });
 
     await repository.appendObservations([
-      make(
-        '00000000-0000-4000-8000-00000000b201',
-        '2026-09-28T00:00:00Z',
-        1,
-      ),
+      make('00000000-0000-4000-8000-00000000b201', '2026-09-28T00:00:00Z', 1),
       make(
         '00000000-0000-4000-8000-00000000b202',
         '2026-09-28T00:01:00Z',
@@ -207,10 +207,7 @@ if (!url) {
       },
     };
     const repository = createPostgresWorldMemoryRepository({ db: failingDb });
-    await assert.rejects(
-      repository.queryObservations(),
-      /connection refused/,
-    );
+    await assert.rejects(repository.queryObservations(), /connection refused/);
   });
 
   test.after(async () => {
