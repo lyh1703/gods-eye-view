@@ -526,7 +526,9 @@ export function createPostgresWorldMemoryRepository({
               $10::timestamptz,
               CASE
                 WHEN $11::text IS NULL THEN NULL
-                ELSE ST_SetSRID(ST_GeomFromGeoJSON($11::text), 4326)
+                ELSE ST_Force2D(
+                  ST_SetSRID(ST_GeomFromGeoJSON($11::text), 4326)
+                )
               END,
               $12::jsonb,
               $13::bigint,
