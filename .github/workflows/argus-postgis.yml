@@ -5,6 +5,7 @@ on:
     branches: ['argus/main']
     paths:
       - 'db/argus_world/**'
+      - 'src/argus/memory/**'
       - '.github/workflows/argus-postgis.yml'
   workflow_dispatch:
 
@@ -83,3 +84,8 @@ jobs:
         env:
           ARGUS_POSTGRES_TEST_URL: postgresql://argus:argus@127.0.0.1:5432/argus_test
         run: node --test src/argus/memory/postgresRepository.test.mjs
+
+      - name: Run temporal and spatial World Memory query gate
+        env:
+          ARGUS_POSTGRES_TEST_URL: postgresql://argus:argus@127.0.0.1:5432/argus_test
+        run: node --test src/argus/memory/worldMemoryQuery.postgres.test.mjs
