@@ -234,6 +234,14 @@ function compareRecords(left, right, order, timeBasis) {
     observationTimeMs(left.observation, timeBasis) -
     observationTimeMs(right.observation, timeBasis);
   if (delta !== 0) return order === 'asc' ? delta : -delta;
+
+  const ingestedDelta =
+    observationTimeMs(left.observation, 'ingested') -
+    observationTimeMs(right.observation, 'ingested');
+  if (ingestedDelta !== 0) {
+    return order === 'asc' ? ingestedDelta : -ingestedDelta;
+  }
+
   return order === 'asc'
     ? left.sequence - right.sequence
     : right.sequence - left.sequence;
