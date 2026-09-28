@@ -141,10 +141,12 @@ function normalizeObservationQuery({
   limit = 100,
   order = 'desc',
   time_basis = 'observed',
+  known_at = null,
 } = {}) {
   const basis = normalizeTimeBasis(time_basis);
   const fromIso = normalizeOptionalTimestamp(from, 'from');
   const toIso = normalizeOptionalTimestamp(to, 'to');
+  const knownAtIso = normalizeOptionalTimestamp(known_at, 'known_at');
   const fromMs = fromIso ? Date.parse(fromIso) : -Infinity;
   const toMs = toIso ? Date.parse(toIso) : Infinity;
   if (fromMs > toMs) {
@@ -171,6 +173,7 @@ function normalizeObservationQuery({
         : requireNonEmptyString(observation_type, 'observation_type'),
     fromMs,
     toMs,
+    knownAtMs: knownAtIso ? Date.parse(knownAtIso) : Infinity,
     bbox: normalizeBbox(bbox),
     limit: normalizeLimit(limit),
     order: normalizeOrder(order),
@@ -208,6 +211,9 @@ function observationMatches(record, query) {
 
   const time = observationTimeMs(observation, query.timeBasis);
   if (time < query.fromMs || time > query.toMs) return false;
+
+  const ingested = observationTimeMs(observation, 'ingested');
+  if (ingested > query.knownAtMs) return false;
 
   if (query.bbox) {
     if (!observation.geometry) return false;
@@ -367,6 +373,7 @@ export function createInMemoryWorldMemoryRepository({
     to = null,
     limit = 100,
     time_basis = 'observed',
+    known_at = null,
   } = {}) {
     const normalizedCenter = normalizeWorldPoint(center);
     const radiusKm = Number(radius_km);
@@ -383,6 +390,7 @@ export function createInMemoryWorldMemoryRepository({
       limit: Number.MAX_SAFE_INTEGER,
       order: 'desc',
       time_basis,
+      known_at,
     });
 
     return candidates
