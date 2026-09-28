@@ -847,5 +847,9 @@
   "src/argus/spatial/geometry.js",
   "src/argus/argusSpatialCore.test.mjs",
   "src/argus/memory/repository.js",
-  "src/argus/argusWorldMemoryRepository.test.mjs"
+  "src/argus/argusWorldMemoryRepository.test.mjs",
+  "src/argus/memory/postgresRepository.js",
+  "src/argus/memory/worldMemoryContractSuite.mjs",
+  "src/argus/memory/inMemoryRepositoryContract.test.mjs",
+  "src/argus/memory/postgresRepository.test.mjs"
 ]
