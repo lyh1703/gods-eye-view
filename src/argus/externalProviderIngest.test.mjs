@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createExternalProviderIngestor } from './externalProviderIngest.js';
+import {
+  classifyObservationFreshness,
+  createExternalProviderIngestor,
+} from './externalProviderIngest.js';
 import { createInMemoryWorldMemoryRepository } from './memory/repository.js';
 import { createWorldMemoryQueryEngine } from './memory/worldMemoryQuery.js';
 import { createUsgsEarthquakesAdapter } from './providers/usgsEarthquakes.js';
@@ -14,7 +17,7 @@ function response(payload, { ok = true, status = 200 } = {}) {
   return { ok, status, json: async () => structuredClone(payload) };
 }
 
-function feed({ mag = 4.2, updated = 1_790_000_010_000 } = {}) {
+function feed({ mag = 4.2, updated = 1_790_153_610_000 } = {}) {
   return {
     type: 'FeatureCollection',
     metadata: { generated: updated },
@@ -26,7 +29,7 @@ function feed({ mag = 4.2, updated = 1_790_000_010_000 } = {}) {
         properties: {
           mag,
           place: 'ARGUS E2E fixture',
-          time: 1_790_000_000_000,
+          time: 1_790_153_600_000,
           updated,
           status: 'reviewed',
           tsunami: 0,
@@ -65,7 +68,7 @@ test('USGS ingest is idempotent, preserves revision history and query evidence',
   assert.equal(duplicate.inserted, 0);
   assert.equal(duplicate.duplicates, 1);
 
-  payload = feed({ mag: 4.7, updated: 1_790_000_020_000 });
+  payload = feed({ mag: 4.7, updated: 1_790_153_620_000 });
   clock.value = new Date('2026-09-23T08:55:00.000Z');
   const revision = await ingestor.ingest(adapter);
   assert.equal(revision.inserted, 1);
@@ -133,6 +136,84 @@ test('provider outage degrades ingest without breaking stored World Memory', asy
     provider_entity_id: 'us-test-1',
   });
   assert.equal(stored.found, true);
+});
+
+test('retryable provider failure retries once and preserves idempotency', async () => {
+  id = 0;
+  const clock = new Date('2026-09-23T08:53:30.000Z');
+  const repository = createInMemoryWorldMemoryRepository({ now: () => clock });
+  let calls = 0;
+  const adapter = createUsgsEarthquakesAdapter({
+    fetchImpl: async () => {
+      calls += 1;
+      if (calls === 1) {
+        return response({}, { ok: false, status: 503 });
+      }
+      return response(feed());
+    },
+    now: () => clock,
+  });
+  const ingestor = createExternalProviderIngestor({
+    repository,
+    now: () => clock,
+    uuid,
+    maxAttempts: 2,
+  });
+
+  const first = await ingestor.ingest(adapter);
+  assert.equal(first.status, 'OK');
+  assert.equal(first.inserted, 1);
+  assert.equal(first.attempts, 2);
+  assert.equal(calls, 2);
+
+  const second = await ingestor.ingest(adapter);
+  assert.equal(second.inserted, 0);
+  assert.equal(second.duplicates, 1);
+});
+
+test('USGS timeout degrades without writing observations', async () => {
+  id = 0;
+  const clock = new Date('2026-09-23T08:53:30.000Z');
+  const repository = createInMemoryWorldMemoryRepository({ now: () => clock });
+  const adapter = createUsgsEarthquakesAdapter({
+    fetchImpl: async (_url, { signal }) =>
+      new Promise((resolve, reject) => {
+        signal.addEventListener(
+          'abort',
+          () => {
+            const error = new Error('aborted');
+            error.name = 'AbortError';
+            reject(error);
+          },
+          { once: true },
+        );
+      }),
+    now: () => clock,
+    timeoutMs: 20,
+  });
+  const ingestor = createExternalProviderIngestor({
+    repository,
+    now: () => clock,
+    uuid,
+    maxAttempts: 1,
+  });
+
+  const result = await ingestor.ingest(adapter);
+  assert.equal(result.status, 'DEGRADED');
+  assert.equal(result.error.name, 'TimeoutError');
+  assert.equal(repository.observationCount(), 0);
+});
+
+test('freshness classifier marks old observations stale', () => {
+  const freshness = classifyObservationFreshness(
+    { timestamp_observed: '2026-09-23T08:00:00.000Z' },
+    {
+      now: new Date('2026-09-23T08:53:30.000Z'),
+      staleAfterSeconds: 900,
+    },
+  );
+  assert.equal(freshness.stale, true);
+  assert.equal(freshness.age_seconds, 3210);
 });
 
 test('malformed USGS payload is degraded rather than silently accepted', async () => {
