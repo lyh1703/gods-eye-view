@@ -6,6 +6,8 @@ on:
     paths:
       - 'db/argus_world/**'
       - 'src/argus/memory/**'
+      - 'src/argus/providers/**'
+      - 'src/argus/externalProviderIngest*'
       - '.github/workflows/argus-postgis.yml'
   workflow_dispatch:
 
@@ -20,7 +22,11 @@ jobs:
   migration:
     name: Clean PostGIS migration
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ['24.14.0', '26']
 
     services:
       postgis:
@@ -71,7 +77,7 @@ jobs:
       - name: Use Node.js for repository integration
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: 24.14.0
+          node-version: ${{ matrix.node-version }}
           cache: npm
 
       - name: Install locked application dependencies
@@ -89,3 +95,11 @@ jobs:
         env:
           ARGUS_POSTGRES_TEST_URL: postgresql://argus:argus@127.0.0.1:5432/argus_test
         run: node --test src/argus/memory/worldMemoryQuery.postgres.test.mjs
+
+      - name: Run external provider contract suite
+        run: node --test src/argus/externalProviderIngest.test.mjs
+
+      - name: Run live USGS to PostGIS E2E gate
+        env:
+          ARGUS_POSTGRES_TEST_URL: postgresql://argus:argus@127.0.0.1:5432/argus_test
+        run: node --test src/argus/externalProviderIngest.postgres.test.mjs

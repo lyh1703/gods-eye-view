@@ -12,6 +12,7 @@ test('ARGUS smoke command validates a normalized provider result', async () => {
       status: 200,
       async json() {
         return {
+          type: 'FeatureCollection',
           features: [
             {
               id: 'smoke-quake-1',

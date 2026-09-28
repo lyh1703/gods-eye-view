@@ -63,6 +63,7 @@ test('USGS adapter normalizes a GeoJSON feature', async () => {
       ok: true,
       async json() {
         return {
+          type: 'FeatureCollection',
           features: [
             {
               id: 'quake-1',

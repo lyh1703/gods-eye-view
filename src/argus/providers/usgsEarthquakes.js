@@ -37,6 +37,7 @@ function inBbox(coordinates, bbox) {
 export function createUsgsEarthquakesAdapter({
   fetchImpl = globalThis.fetch,
   now = () => new Date(),
+  timeoutMs = 10_000,
 } = {}) {
   if (typeof fetchImpl !== 'function') {
     throw new TypeError('USGS adapter requires fetch');
@@ -46,13 +47,63 @@ export function createUsgsEarthquakesAdapter({
     metadata: USGS_EARTHQUAKES_PROVIDER,
 
     async query({ scope, filters = {}, limit = 100, ingestionRunId } = {}) {
-      const response = await fetchImpl(USGS_EARTHQUAKES_PROVIDER.source_url);
-      if (!response.ok) {
-        throw new Error(`USGS request failed with HTTP ${response.status}`);
+      const timeout = Math.max(0, Number(timeoutMs) || 0);
+      const controller = new AbortController();
+      const timeoutId =
+        timeout > 0 ? setTimeout(() => controller.abort(), timeout) : null;
+
+      let payload;
+      try {
+        const response = await fetchImpl(USGS_EARTHQUAKES_PROVIDER.source_url, {
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          const error = new Error(
+            `USGS request failed with HTTP ${response.status}`,
+          );
+          error.status = response.status;
+          error.retryable =
+            response.status === 408 ||
+            response.status === 429 ||
+            response.status >= 500;
+          throw error;
+        }
+        payload = await response.json();
+      } catch (error) {
+        if (controller.signal.aborted) {
+          const timeoutError = new Error(
+            `USGS request timed out after ${timeout}ms`,
+            { cause: error },
+          );
+          timeoutError.name = 'TimeoutError';
+          timeoutError.retryable = true;
+          throw timeoutError;
+        }
+        if (typeof error?.retryable === 'boolean') {
+          throw error;
+        }
+        const networkError = new Error(
+          `USGS request failed: ${error?.message ?? String(error)}`,
+          { cause: error },
+        );
+        networkError.name = 'ProviderNetworkError';
+        networkError.retryable = true;
+        throw networkError;
+      } finally {
+        if (timeoutId != null) {
+          clearTimeout(timeoutId);
+        }
       }
 
-      const payload = await response.json();
-      const features = Array.isArray(payload?.features) ? payload.features : [];
+      if (
+        payload?.type !== 'FeatureCollection' ||
+        !Array.isArray(payload.features)
+      ) {
+        throw new TypeError(
+          'USGS payload must be a GeoJSON FeatureCollection with features',
+        );
+      }
+      const features = payload.features;
       const receivedAt = now();
       const minMagnitude = Number(filters.min_magnitude ?? -Infinity);
       const bbox = scope?.bbox;

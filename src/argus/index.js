@@ -1,3 +1,7 @@
+export {
+  classifyObservationFreshness,
+  createExternalProviderIngestor,
+} from './externalProviderIngest.js';
 export { createWorldMemoryQueryEngine } from './memory/worldMemoryQuery.js';
 export { createPostgresWorldMemoryRepository } from './memory/postgresRepository.js';
 export {
