@@ -52,7 +52,10 @@ export function createUsgsEarthquakesAdapter({
       }
 
       const payload = await response.json();
-      const features = Array.isArray(payload?.features) ? payload.features : [];
+      if (payload?.type !== 'FeatureCollection' || !Array.isArray(payload.features)) {
+        throw new TypeError('USGS payload must be a GeoJSON FeatureCollection with features');
+      }
+      const features = payload.features;
       const receivedAt = now();
       const minMagnitude = Number(filters.min_magnitude ?? -Infinity);
       const bbox = scope?.bbox;
