@@ -1,5 +1,3 @@
-import { createHash, randomUUID } from 'node:crypto';
-
 import { validateWorldMemoryRepository } from './memory/repository.js';
 
 function stableValue(value) {
@@ -14,20 +12,21 @@ function stableValue(value) {
   return value;
 }
 
-function contentHash(observation) {
-  return createHash('sha256')
-    .update(
-      JSON.stringify(
-        stableValue({
-          observation_type: observation.observation_type,
-          timestamp_observed: observation.timestamp_observed,
-          geometry: observation.geometry ?? null,
-          properties: observation.properties ?? {},
-          source_url: observation.source_url,
-        }),
-      ),
-    )
-    .digest('hex');
+async function contentHash(observation) {
+  const payload = JSON.stringify(
+    stableValue({
+      observation_type: observation.observation_type,
+      timestamp_observed: observation.timestamp_observed,
+      geometry: observation.geometry ?? null,
+      properties: observation.properties ?? {},
+      source_url: observation.source_url,
+    }),
+  );
+  const bytes = new TextEncoder().encode(payload);
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, '0'),
+  ).join('');
 }
 
 function errorSummary(error) {
@@ -72,7 +71,7 @@ export function classifyObservationFreshness(
 export function createExternalProviderIngestor({
   repository,
   now = () => new Date(),
-  uuid = randomUUID,
+  uuid = () => globalThis.crypto.randomUUID(),
   staleAfterSeconds = 900,
   maxAttempts = 2,
   retryDelayMs = 0,
@@ -169,7 +168,7 @@ export function createExternalProviderIngestor({
     let revisions = 0;
 
     for (const observation of observations) {
-      const hash = contentHash(observation);
+      const hash = await contentHash(observation);
       const history = await memory.getEntityHistory({
         provider_ids: [providerId],
         entity_type: observation.entity_type,
