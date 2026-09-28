@@ -1,5 +1,5 @@
 import { createInMemoryWorldMemoryRepository } from './repository.js';
-import { registerWorldMemoryRepositoryContract } from './worldMemoryContractSuite.mjs';
+import { registerWorldMemoryRepositoryContract } from './worldMemoryContract.test.mjs';
 
 registerWorldMemoryRepositoryContract('InMemoryWorldMemory', async () => ({
   repository: createInMemoryWorldMemoryRepository({
