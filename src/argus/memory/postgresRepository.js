@@ -46,6 +46,24 @@ function normalizeOrder(value) {
   return order;
 }
 
+function normalizeTimeBasis(value) {
+  const basis = value ?? 'observed';
+  if (!['observed', 'effective', 'received'].includes(basis)) {
+    throw new TypeError(
+      "time_basis must be 'observed', 'effective', or 'received'",
+    );
+  }
+  return basis;
+}
+
+function timeColumnFor(basis) {
+  return {
+    observed: 'o.observed_at',
+    effective: 'o.effective_at',
+    received: 'o.received_at',
+  }[normalizeTimeBasis(basis)];
+}
+
 function normalizeBbox(bbox) {
   if (bbox == null) return null;
   if (!Array.isArray(bbox) || bbox.length !== 4) {
@@ -159,12 +177,14 @@ function buildObservationQuery(
     provider_ids,
     entity_type = null,
     provider_entity_id = null,
+    canonical_entity_id = null,
     observation_type = null,
     from = null,
     to = null,
     bbox = null,
     limit = 100,
     order = 'desc',
+    time_basis = 'observed',
   } = {},
 ) {
   const params = [];
@@ -201,6 +221,13 @@ function buildObservationQuery(
       )}`,
     );
   }
+  if (canonical_entity_id != null) {
+    conditions.push(
+      `o.canonical_entity_id = ${add(
+        requireString(canonical_entity_id, 'canonical_entity_id'),
+      )}::uuid`,
+    );
+  }
   if (observation_type != null) {
     conditions.push(
       `o.observation_type = ${add(
@@ -209,13 +236,18 @@ function buildObservationQuery(
     );
   }
 
+  const timeColumn = timeColumnFor(time_basis);
   const fromIso = normalizeTimestamp(from, 'from');
   const toIso = normalizeTimestamp(to, 'to');
   if (fromIso && toIso && Date.parse(fromIso) > Date.parse(toIso)) {
     throw new RangeError('from must not be after to');
   }
-  if (fromIso) conditions.push(`o.observed_at >= ${add(fromIso)}::timestamptz`);
-  if (toIso) conditions.push(`o.observed_at <= ${add(toIso)}::timestamptz`);
+  if (fromIso) {
+    conditions.push(`${timeColumn} >= ${add(fromIso)}::timestamptz`);
+  }
+  if (toIso) {
+    conditions.push(`${timeColumn} <= ${add(toIso)}::timestamptz`);
+  }
 
   const normalizedBbox = normalizeBbox(bbox);
   if (normalizedBbox) {
@@ -241,7 +273,7 @@ function buildObservationQuery(
     text: `
       ${observationSelect(schema)}
       WHERE ${conditions.join(' AND ')}
-      ORDER BY o.observed_at ${normalizedOrder}, o.created_at ${normalizedOrder}
+      ORDER BY ${timeColumn} ${normalizedOrder}, o.created_at ${normalizedOrder}
       LIMIT ${add(normalizedLimit)}::integer
     `,
     values: params,
@@ -496,6 +528,7 @@ export function createPostgresWorldMemoryRepository({
     from = null,
     to = null,
     limit = 100,
+    time_basis = 'observed',
   } = {}) {
     const [longitude, latitude] = normalizeWorldPoint(center);
     const radiusKm = Number(radius_km);
@@ -509,8 +542,9 @@ export function createPostgresWorldMemoryRepository({
       observation_type,
       from,
       to,
-      limit: Number.MAX_SAFE_INTEGER,
+      limit: 2147483647,
       order: 'desc',
+      time_basis,
     });
 
     const values = base.values.slice(0, -1);

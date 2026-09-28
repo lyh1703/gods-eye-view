@@ -851,5 +851,8 @@
   "src/argus/memory/postgresRepository.js",
   "src/argus/memory/inMemoryRepositoryContract.test.mjs",
   "src/argus/memory/postgresRepository.test.mjs",
-  "src/argus/memory/worldMemoryContract.test.mjs"
+  "src/argus/memory/worldMemoryContract.test.mjs",
+  "src/argus/memory/worldMemoryQuery.js",
+  "src/argus/memory/worldMemoryQuery.test.mjs",
+  "src/argus/memory/worldMemoryQuery.postgres.test.mjs"
 ]

@@ -1,3 +1,4 @@
+export { createWorldMemoryQueryEngine } from './memory/worldMemoryQuery.js';
 export { createPostgresWorldMemoryRepository } from './memory/postgresRepository.js';
 export {
   createInMemoryWorldMemoryRepository,

@@ -103,21 +103,45 @@ function normalizeBbox(bbox) {
   return values;
 }
 
-function observedAtMs(observation) {
-  return Date.parse(observation.timestamp_observed);
+const TIME_BASIS_FIELDS = Object.freeze({
+  observed: 'timestamp_observed',
+  effective: 'effective_at',
+  received: 'timestamp_received',
+});
+
+function normalizeTimeBasis(value) {
+  const basis = value ?? 'observed';
+  if (!Object.hasOwn(TIME_BASIS_FIELDS, basis)) {
+    throw new TypeError(
+      "time_basis must be 'observed', 'effective', or 'received'",
+    );
+  }
+  return basis;
+}
+
+function observationTimeMs(observation, basis) {
+  const field = TIME_BASIS_FIELDS[basis];
+  const value =
+    observation?.[field] ??
+    (basis === 'effective' ? observation?.timestamp_observed : null);
+  const parsed = Date.parse(value ?? '');
+  return Number.isFinite(parsed) ? parsed : -Infinity;
 }
 
 function normalizeObservationQuery({
   provider_ids,
   entity_type = null,
   provider_entity_id = null,
+  canonical_entity_id = null,
   observation_type = null,
   from = null,
   to = null,
   bbox = null,
   limit = 100,
   order = 'desc',
+  time_basis = 'observed',
 } = {}) {
+  const basis = normalizeTimeBasis(time_basis);
   const fromIso = normalizeOptionalTimestamp(from, 'from');
   const toIso = normalizeOptionalTimestamp(to, 'to');
   const fromMs = fromIso ? Date.parse(fromIso) : -Infinity;
@@ -136,6 +160,10 @@ function normalizeObservationQuery({
       provider_entity_id == null
         ? null
         : requireNonEmptyString(provider_entity_id, 'provider_entity_id'),
+    canonicalEntityId:
+      canonical_entity_id == null
+        ? null
+        : requireNonEmptyString(canonical_entity_id, 'canonical_entity_id'),
     observationType:
       observation_type == null
         ? null
@@ -145,6 +173,7 @@ function normalizeObservationQuery({
     bbox: normalizeBbox(bbox),
     limit: normalizeLimit(limit),
     order: normalizeOrder(order),
+    timeBasis: basis,
   };
 }
 
@@ -164,14 +193,20 @@ function observationMatches(record, query) {
     return false;
   }
   if (
+    query.canonicalEntityId &&
+    observation.canonical_entity_id !== query.canonicalEntityId
+  ) {
+    return false;
+  }
+  if (
     query.observationType &&
     observation.observation_type !== query.observationType
   ) {
     return false;
   }
 
-  const observed = observedAtMs(observation);
-  if (observed < query.fromMs || observed > query.toMs) return false;
+  const time = observationTimeMs(observation, query.timeBasis);
+  if (time < query.fromMs || time > query.toMs) return false;
 
   if (query.bbox) {
     if (!observation.geometry) return false;
@@ -187,9 +222,10 @@ function observationMatches(record, query) {
   return true;
 }
 
-function compareRecords(left, right, order) {
+function compareRecords(left, right, order, timeBasis) {
   const delta =
-    observedAtMs(left.observation) - observedAtMs(right.observation);
+    observationTimeMs(left.observation, timeBasis) -
+    observationTimeMs(right.observation, timeBasis);
   if (delta !== 0) return order === 'asc' ? delta : -delta;
   return order === 'asc'
     ? left.sequence - right.sequence
@@ -295,7 +331,9 @@ export function createInMemoryWorldMemoryRepository({
 
     return observationRecords
       .filter((record) => observationMatches(record, query))
-      .sort((left, right) => compareRecords(left, right, query.order))
+      .sort((left, right) =>
+        compareRecords(left, right, query.order, query.timeBasis),
+      )
       .slice(0, query.limit)
       .map((record) => cloneValue(record.observation));
   }
@@ -324,6 +362,7 @@ export function createInMemoryWorldMemoryRepository({
     from = null,
     to = null,
     limit = 100,
+    time_basis = 'observed',
   } = {}) {
     const normalizedCenter = normalizeWorldPoint(center);
     const radiusKm = Number(radius_km);
@@ -339,6 +378,7 @@ export function createInMemoryWorldMemoryRepository({
       to,
       limit: Number.MAX_SAFE_INTEGER,
       order: 'desc',
+      time_basis,
     });
 
     return candidates
