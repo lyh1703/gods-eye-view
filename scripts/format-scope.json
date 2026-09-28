@@ -849,7 +849,7 @@
   "src/argus/memory/repository.js",
   "src/argus/argusWorldMemoryRepository.test.mjs",
   "src/argus/memory/postgresRepository.js",
-  "src/argus/memory/worldMemoryContractSuite.mjs",
   "src/argus/memory/inMemoryRepositoryContract.test.mjs",
-  "src/argus/memory/postgresRepository.test.mjs"
+  "src/argus/memory/postgresRepository.test.mjs",
+  "src/argus/memory/worldMemoryContract.test.mjs"
 ]
