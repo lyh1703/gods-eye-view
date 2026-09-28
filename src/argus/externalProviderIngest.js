@@ -83,7 +83,10 @@ export function createExternalProviderIngestor({
   const retryDelay = Math.max(0, Number(retryDelayMs) || 0);
 
   async function ingest(adapter, query = {}) {
-    if (!adapter?.metadata?.provider_id || typeof adapter.query !== 'function') {
+    if (
+      !adapter?.metadata?.provider_id ||
+      typeof adapter.query !== 'function'
+    ) {
       throw new TypeError(
         'adapter metadata.provider_id and query() are required',
       );
