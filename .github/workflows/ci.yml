@@ -42,8 +42,11 @@ jobs:
       - name: Run setup policy checks
         run: npm run doctor -- --json
 
-      - name: Check adopted formatting
-        run: npm run format:check
+      - name: Diagnose adopted formatting
+        run: |
+          npm run format
+          git diff -- src/argus/nexusVerifiedQuery.js
+          exit 1
 
       - name: Check package boundaries
         run: npm run check:boundaries
