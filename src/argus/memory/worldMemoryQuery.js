@@ -3,10 +3,7 @@ import {
   normalizeWorldPoint,
   pointCoordinates,
 } from '../worldOperations.js';
-import {
-  geometryBbox,
-  geometryBboxesIntersect,
-} from '../spatial/geometry.js';
+import { geometryBbox, geometryBboxesIntersect } from '../spatial/geometry.js';
 import { validateWorldMemoryRepository } from './repository.js';
 
 const UUID_PATTERN =
