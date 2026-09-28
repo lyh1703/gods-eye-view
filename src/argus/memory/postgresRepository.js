@@ -112,37 +112,43 @@ function mapObservationRow(row) {
   };
 }
 
+function observationColumns() {
+  return `
+    o.observation_id::text,
+    o.provider_id,
+    o.provider_entity_id,
+    o.entity_type,
+    o.canonical_entity_id::text,
+    o.observation_type,
+    o.observed_at,
+    o.effective_at,
+    o.received_at,
+    o.ingested_at,
+    CASE
+      WHEN o.geometry IS NULL THEN NULL
+      ELSE ST_AsGeoJSON(o.geometry)::jsonb
+    END AS geometry,
+    o.properties,
+    o.freshness_seconds,
+    o.coverage,
+    o.confidence,
+    o.license_class,
+    o.commercial_allowed,
+    o.attribution_required,
+    o.retention_policy,
+    o.source_url,
+    o.rate_limit_class,
+    o.ingestion_run_id::text,
+    o.source_artifact_id::text,
+    o.supersedes_observation_id::text,
+    o.content_hash
+  `;
+}
+
 function observationSelect(schema) {
   return `
     SELECT
-      o.observation_id::text,
-      o.provider_id,
-      o.provider_entity_id,
-      o.entity_type,
-      o.canonical_entity_id::text,
-      o.observation_type,
-      o.observed_at,
-      o.effective_at,
-      o.received_at,
-      o.ingested_at,
-      CASE
-        WHEN o.geometry IS NULL THEN NULL
-        ELSE ST_AsGeoJSON(o.geometry)::jsonb
-      END AS geometry,
-      o.properties,
-      o.freshness_seconds,
-      o.coverage,
-      o.confidence,
-      o.license_class,
-      o.commercial_allowed,
-      o.attribution_required,
-      o.retention_policy,
-      o.source_url,
-      o.rate_limit_class,
-      o.ingestion_run_id::text,
-      o.source_artifact_id::text,
-      o.supersedes_observation_id::text,
-      o.content_hash
+      ${observationColumns()}
     FROM ${schema}.observations o
   `;
 }
@@ -527,9 +533,11 @@ export function createPostgresWorldMemoryRepository({
 
     const result = await db.query(
       `
-        ${observationSelect(safeSchema)},
-        ST_Distance(o.geometry::geography, ${point}::geography) / 1000.0
-          AS distance_km
+        SELECT
+          ${observationColumns()},
+          ST_Distance(o.geometry::geography, ${point}::geography) / 1000.0
+            AS distance_km
+        FROM ${safeSchema}.observations o
         WHERE ${whereMatch[1]}
           AND o.geometry IS NOT NULL
           AND ST_DWithin(
