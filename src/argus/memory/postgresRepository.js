@@ -285,7 +285,10 @@ function buildObservationQuery(
     text: `
       ${observationSelect(schema)}
       WHERE ${conditions.join(' AND ')}
-      ORDER BY ${timeColumn} ${normalizedOrder}, o.created_at ${normalizedOrder}
+      ORDER BY
+        ${timeColumn} ${normalizedOrder},
+        o.ingested_at ${normalizedOrder},
+        o.created_at ${normalizedOrder}
       LIMIT ${add(normalizedLimit)}::integer
     `,
     values: params,
