@@ -12,7 +12,7 @@ function requireObject(value, field) {
 
 function normalizeRequest(request) {
   requireObject(request, 'request');
-  const operation = String(request.operation ?? '').trim().toLowerCase();
+  const operation = String(request.operation ?? '')\n    .trim()\n    .toLowerCase();
   if (!OPERATIONS.has(operation)) {
     throw new TypeError(
       "operation must be 'current', 'history', 'query', or 'near'",
