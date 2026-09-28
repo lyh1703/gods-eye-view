@@ -336,6 +336,48 @@ function validateObservationBatch(observations) {
   });
 }
 
+function normalizeProviderMetadata(provider) {
+  if (provider == null) return null;
+  if (!provider || typeof provider !== 'object' || Array.isArray(provider)) {
+    throw new TypeError('provider metadata must be an object');
+  }
+
+  const commercialAllowed = provider.commercial_allowed ?? null;
+  if (
+    commercialAllowed !== null &&
+    typeof commercialAllowed !== 'boolean'
+  ) {
+    throw new TypeError('provider.commercial_allowed must be boolean or null');
+  }
+
+  const attributionRequired = provider.attribution_required ?? false;
+  if (typeof attributionRequired !== 'boolean') {
+    throw new TypeError('provider.attribution_required must be boolean');
+  }
+
+  return {
+    provider_id: requireString(provider.provider_id, 'provider.provider_id'),
+    category: requireString(provider.category, 'provider.category'),
+    geography: provider.geography ?? null,
+    auth_mode: provider.auth_mode ?? null,
+    cost_class: provider.cost_class ?? null,
+    update_frequency: provider.update_frequency ?? null,
+    latency_class: provider.latency_class ?? provider.latency ?? null,
+    coverage: provider.coverage ?? null,
+    license_class: requireString(
+      provider.license_class,
+      'provider.license_class',
+    ),
+    commercial_allowed: commercialAllowed,
+    attribution_required: attributionRequired,
+    retention_policy: provider.retention_policy ?? null,
+    reliability: provider.reliability ?? null,
+    adapter_status: provider.adapter_status ?? null,
+    source_url: provider.source_url ?? null,
+    metadata: structuredClone(provider.metadata ?? {}),
+  };
+}
+
 function normalizeIngestionRun(run) {
   if (!run || typeof run !== 'object' || Array.isArray(run)) {
     throw new TypeError('ingestion run must be an object');
@@ -361,10 +403,17 @@ function normalizeIngestionRun(run) {
     throw new RangeError('completed_at must not be before started_at');
   }
 
+  const providerId = requireString(run.provider_id, 'provider_id');
+  const provider = normalizeProviderMetadata(run.provider);
+  if (provider && provider.provider_id !== providerId) {
+    throw new TypeError('provider.provider_id must match provider_id');
+  }
+
   return {
     ...structuredClone(run),
     ingestion_run_id: requireString(run.ingestion_run_id, 'ingestion_run_id'),
-    provider_id: requireString(run.provider_id, 'provider_id'),
+    provider_id: providerId,
+    provider,
     status,
     started_at: startedAt,
     completed_at: completedAt,
@@ -610,8 +659,80 @@ export function createPostgresWorldMemoryRepository({
     }));
   }
 
+  async function upsertProvider(provider) {
+    if (!provider) return null;
+
+    const result = await db.query(
+      `
+        INSERT INTO ${safeSchema}.providers (
+          provider_id,
+          category,
+          geography,
+          auth_mode,
+          cost_class,
+          update_frequency,
+          latency_class,
+          coverage,
+          license_class,
+          commercial_allowed,
+          attribution_required,
+          retention_policy,
+          reliability,
+          adapter_status,
+          source_url,
+          metadata,
+          last_verified_at
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8,
+          $9, $10::boolean, $11::boolean, $12, $13, $14, $15,
+          $16::jsonb, now()
+        )
+        ON CONFLICT (provider_id) DO UPDATE SET
+          category = EXCLUDED.category,
+          geography = EXCLUDED.geography,
+          auth_mode = EXCLUDED.auth_mode,
+          cost_class = EXCLUDED.cost_class,
+          update_frequency = EXCLUDED.update_frequency,
+          latency_class = EXCLUDED.latency_class,
+          coverage = EXCLUDED.coverage,
+          license_class = EXCLUDED.license_class,
+          commercial_allowed = EXCLUDED.commercial_allowed,
+          attribution_required = EXCLUDED.attribution_required,
+          retention_policy = EXCLUDED.retention_policy,
+          reliability = EXCLUDED.reliability,
+          adapter_status = EXCLUDED.adapter_status,
+          source_url = EXCLUDED.source_url,
+          metadata = EXCLUDED.metadata,
+          last_verified_at = now(),
+          updated_at = now()
+        RETURNING provider_id
+      `,
+      [
+        provider.provider_id,
+        provider.category,
+        provider.geography,
+        provider.auth_mode,
+        provider.cost_class,
+        provider.update_frequency,
+        provider.latency_class,
+        provider.coverage,
+        provider.license_class,
+        provider.commercial_allowed,
+        provider.attribution_required,
+        provider.retention_policy,
+        provider.reliability,
+        provider.adapter_status,
+        provider.source_url,
+        provider.metadata,
+      ],
+    );
+
+    return result.rows[0]?.provider_id ?? null;
+  }
+
   async function saveIngestionRun(run) {
     const normalized = normalizeIngestionRun(run);
+    await upsertProvider(normalized.provider);
     const result = await db.query(
       `
         INSERT INTO ${safeSchema}.ingestion_runs (
