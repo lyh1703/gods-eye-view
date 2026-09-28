@@ -343,10 +343,7 @@ function normalizeProviderMetadata(provider) {
   }
 
   const commercialAllowed = provider.commercial_allowed ?? null;
-  if (
-    commercialAllowed !== null &&
-    typeof commercialAllowed !== 'boolean'
-  ) {
+  if (commercialAllowed !== null && typeof commercialAllowed !== 'boolean') {
     throw new TypeError('provider.commercial_allowed must be boolean or null');
   }
 
