@@ -9,7 +9,11 @@ import { createUsgsEarthquakesAdapter } from './providers/usgsEarthquakes.js';
 const url = process.env.ARGUS_POSTGRES_TEST_URL;
 
 if (!url) {
-  test('real USGS -> PostGIS E2E requires ARGUS_POSTGRES_TEST_URL', { skip: true }, () => {});
+  test(
+    'real USGS -> PostGIS E2E requires ARGUS_POSTGRES_TEST_URL',
+    { skip: true },
+    () => {},
+  );
 } else {
   const { Pool } = await import('pg');
 
@@ -80,7 +84,9 @@ if (!url) {
         limit: 100,
       });
       assert.ok(
-        combined.observations.some((item) => item.entity_id === sample.entity_id),
+        combined.observations.some(
+          (item) => item.entity_id === sample.entity_id,
+        ),
       );
 
       const second = await ingestor.ingest(adapter, { limit: 10 });
