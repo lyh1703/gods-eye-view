@@ -107,13 +107,14 @@ const TIME_BASIS_FIELDS = Object.freeze({
   observed: 'timestamp_observed',
   effective: 'effective_at',
   received: 'timestamp_received',
+  ingested: 'ingested_at',
 });
 
 function normalizeTimeBasis(value) {
   const basis = value ?? 'observed';
   if (!Object.hasOwn(TIME_BASIS_FIELDS, basis)) {
     throw new TypeError(
-      "time_basis must be 'observed', 'effective', or 'received'",
+      "time_basis must be 'observed', 'effective', 'received', or 'ingested'",
     );
   }
   return basis;
@@ -313,7 +314,10 @@ export function createInMemoryWorldMemoryRepository({
     const pending = validated.map((observation) => ({
       sequence: ++sequence,
       recorded_at: recordedAt,
-      observation,
+      observation: {
+        ...observation,
+        ingested_at: observation.ingested_at ?? recordedAt,
+      },
     }));
 
     observationRecords.push(...pending);
