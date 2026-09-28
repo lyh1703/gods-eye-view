@@ -1,3 +1,4 @@
+export { createPostgresWorldMemoryRepository } from './memory/postgresRepository.js';
 export {
   createInMemoryWorldMemoryRepository,
   validateWorldMemoryRepository,

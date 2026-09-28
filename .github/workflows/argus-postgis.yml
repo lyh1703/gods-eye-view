@@ -66,3 +66,20 @@ jobs:
 
       - name: Re-run migration gate
         run: psql -v ON_ERROR_STOP=1 -f db/argus_world/001_world_memory_test.sql
+
+      - name: Use Node.js for repository integration
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24.14.0
+          cache: npm
+
+      - name: Install locked application dependencies
+        run: npm ci
+
+      - name: Install pinned PostgreSQL test driver
+        run: npm install --no-save --package-lock=false pg@8.16.3
+
+      - name: Run Postgres repository contract suite
+        env:
+          ARGUS_POSTGRES_TEST_URL: postgresql://argus:argus@127.0.0.1:5432/argus_test
+        run: node --test src/argus/memory/postgresRepository.test.mjs
