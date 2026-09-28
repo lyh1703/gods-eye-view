@@ -37,6 +37,18 @@ function errorSummary(error) {
   };
 }
 
+function isRetryableProviderError(error) {
+  return (
+    error?.retryable === true ||
+    error?.name === 'AbortError' ||
+    error?.name === 'TimeoutError'
+  );
+}
+
+function defaultSleep(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
 export function classifyObservationFreshness(
   observation,
   { now = new Date(), staleAfterSeconds = 900 } = {},
@@ -62,14 +74,17 @@ export function createExternalProviderIngestor({
   now = () => new Date(),
   uuid = randomUUID,
   staleAfterSeconds = 900,
+  maxAttempts = 2,
+  retryDelayMs = 0,
+  sleep = defaultSleep,
 } = {}) {
   const memory = validateWorldMemoryRepository(repository);
+  const attemptLimit = Math.max(1, Math.floor(Number(maxAttempts) || 1));
+  const retryDelay = Math.max(0, Number(retryDelayMs) || 0);
 
   async function ingest(adapter, query = {}) {
     if (!adapter?.metadata?.provider_id || typeof adapter.query !== 'function') {
-      throw new TypeError(
-        'adapter metadata.provider_id and query() are required',
-      );
+      throw new TypeError('adapter metadata.provider_id and query() are required');
     }
 
     const providerId = adapter.metadata.provider_id;
@@ -93,10 +108,32 @@ export function createExternalProviderIngestor({
     await memory.saveIngestionRun(baseRun);
 
     let observations;
+    let attemptsUsed = 0;
     try {
-      observations = await adapter.query({ ...query, ingestionRunId: runId });
-      if (!Array.isArray(observations)) {
-        throw new TypeError('provider query must return an observation array');
+      for (let attempt = 1; attempt <= attemptLimit; attempt += 1) {
+        attemptsUsed = attempt;
+        try {
+          observations = await adapter.query({
+            ...query,
+            ingestionRunId: runId,
+          });
+          if (!Array.isArray(observations)) {
+            throw new TypeError(
+              'provider query must return an observation array',
+            );
+          }
+          break;
+        } catch (error) {
+          if (
+            attempt >= attemptLimit ||
+            !isRetryableProviderError(error)
+          ) {
+            throw error;
+          }
+          if (retryDelay > 0) {
+            await sleep(retryDelay);
+          }
+        }
       }
     } catch (error) {
       const completedAt = now().toISOString();
@@ -108,6 +145,8 @@ export function createExternalProviderIngestor({
           ...baseRun.metadata,
           degraded: true,
           phase: 'fetch-normalize',
+          attempts: attemptsUsed,
+          retry_count: Math.max(0, attemptsUsed - 1),
           error: errorSummary(error),
         },
       });
@@ -118,6 +157,7 @@ export function createExternalProviderIngestor({
         inserted: 0,
         duplicates: 0,
         revisions: 0,
+        attempts: attemptsUsed,
         error: errorSummary(error),
       };
     }
@@ -178,6 +218,8 @@ export function createExternalProviderIngestor({
         metadata: {
           ...baseRun.metadata,
           degraded: false,
+          attempts: attemptsUsed,
+          retry_count: Math.max(0, attemptsUsed - 1),
           duplicates,
           revisions,
           stale_count: staleCount,
@@ -197,6 +239,7 @@ export function createExternalProviderIngestor({
         inserted: persisted.inserted,
         duplicates,
         revisions,
+        attempts: attemptsUsed,
         stale_count: staleCount,
         last_normal_observation_at:
           observations
