@@ -16,8 +16,7 @@ export const GEV_TRAFFIC_PROVIDER = Object.freeze({
   retention_policy: 'retain normalized observations with source provenance',
   reliability: 'inherited-gev-serve-stale-on-failure',
   adapter_status: 'argus-mapped-validated',
-  source_url:
-    'https://api.tomtom.com/traffic/map/4/tile/flow/relative/',
+  source_url: 'https://api.tomtom.com/traffic/map/4/tile/flow/relative/',
 });
 
 function boundsFromScope(scope) {
