@@ -88,12 +88,15 @@ export function createGevOpenSkyAdapter({
           GEV_OPENSKY_PROVIDER.coverage,
         now: receivedAt.getTime(),
         stale:
-          String(response.headers?.get?.('x-opensky-cache') || '').toUpperCase() ===
-          'STALE',
+          String(
+            response.headers?.get?.('x-opensky-cache') || '',
+          ).toUpperCase() === 'STALE',
       });
 
       const entityFilter =
-        filters.entity_id == null ? null : String(filters.entity_id).toLowerCase();
+        filters.entity_id == null
+          ? null
+          : String(filters.entity_id).toLowerCase();
       const max = Math.max(0, Math.min(Number(limit) || 100, 2000));
 
       return snapshot.records
@@ -102,7 +105,9 @@ export function createGevOpenSkyAdapter({
         .slice(0, max)
         .map((record) => {
           const observedMs =
-            record.positionTimeMs ?? record.contactTimeMs ?? snapshot.observedAtMs;
+            record.positionTimeMs ??
+            record.contactTimeMs ??
+            snapshot.observedAtMs;
           if (!Number.isFinite(observedMs)) return null;
           return createObservationEnvelope({
             provider_id: GEV_OPENSKY_PROVIDER.provider_id,
