@@ -1,4 +1,8 @@
 export {
+  UPSTREAM_GEV_CAPABILITY_INVENTORY,
+  listUpstreamGevCapabilities,
+} from './upstreamCapabilityInventory.js';
+export {
   ARGUS_NEXUS_QUERY_CONTRACT_ID,
   createNexusVerifiedQueryAdapter,
 } from './nexusVerifiedQuery.js';
