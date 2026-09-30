@@ -40,19 +40,13 @@ export const UPSTREAM_GEV_CAPABILITY_INVENTORY = Object.freeze([
   {
     capability_id: 'traffic',
     domain: 'mobility',
-    code_paths: [
-      'src/app/layers/traffic.js',
-      'server/providers/traffic.js',
-    ],
+    code_paths: ['src/app/layers/traffic.js', 'server/providers/traffic.js'],
     argus_status: CAPABILITY_STATUS,
   },
   {
     capability_id: 'cctv',
     domain: 'vision',
-    code_paths: [
-      'src/app/layers/cctv.js',
-      'server/providers/cctv.js',
-    ],
+    code_paths: ['src/app/layers/cctv.js', 'server/providers/cctv.js'],
     argus_status: CAPABILITY_STATUS,
   },
   {
@@ -68,28 +62,19 @@ export const UPSTREAM_GEV_CAPABILITY_INVENTORY = Object.freeze([
   {
     capability_id: 'fire-firms',
     domain: 'disaster',
-    code_paths: [
-      'src/app/layers/firms.js',
-      'server/providers/firms.js',
-    ],
+    code_paths: ['src/app/layers/firms.js', 'server/providers/firms.js'],
     argus_status: CAPABILITY_STATUS,
   },
   {
     capability_id: 'transit',
     domain: 'mobility',
-    code_paths: [
-      'src/app/layers/transit.js',
-      'server/providers/transit.js',
-    ],
+    code_paths: ['src/app/layers/transit.js', 'server/providers/transit.js'],
     argus_status: CAPABILITY_STATUS,
   },
   {
     capability_id: 'radio',
     domain: 'rf-audio',
-    code_paths: [
-      'src/app/layers/radio.js',
-      'server/providers/radio.js',
-    ],
+    code_paths: ['src/app/layers/radio.js', 'server/providers/radio.js'],
     argus_status: CAPABILITY_STATUS,
   },
 ]);
