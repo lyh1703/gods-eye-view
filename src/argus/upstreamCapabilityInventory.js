@@ -151,10 +151,7 @@ export const UPSTREAM_GEV_CAPABILITY_INVENTORY = Object.freeze([
   capability({
     capability_id: 'alpr-cameras',
     domain: 'vision',
-    code_paths: [
-      'src/app/layers/alprCameras.js',
-      'src/layers/alpr/index.js',
-    ],
+    code_paths: ['src/app/layers/alprCameras.js', 'src/layers/alpr/index.js'],
   }),
   capability({
     capability_id: 'fire-firms',
