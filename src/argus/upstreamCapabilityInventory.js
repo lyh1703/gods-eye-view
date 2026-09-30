@@ -44,6 +44,9 @@ export const UPSTREAM_GEV_CAPABILITY_INVENTORY = Object.freeze([
       'server/providers/aircraft/opensky.js',
       'server/providers/aircraft/adsb-lol.js',
     ],
+    mapped_to_argus: true,
+    query_callable: true,
+    validated: true,
   }),
   capability({
     capability_id: 'local-adsb',
@@ -82,6 +85,9 @@ export const UPSTREAM_GEV_CAPABILITY_INVENTORY = Object.freeze([
       'server/providers/regional/weather.js',
       'server/providers/regional/briefing.js',
     ],
+    mapped_to_argus: true,
+    query_callable: true,
+    validated: true,
   }),
   capability({
     capability_id: 'wind-fields',
@@ -101,6 +107,9 @@ export const UPSTREAM_GEV_CAPABILITY_INVENTORY = Object.freeze([
       'src/layers/traffic/flowDecode.js',
       'server/providers/traffic.js',
     ],
+    mapped_to_argus: true,
+    query_callable: true,
+    validated: true,
   }),
   capability({
     capability_id: 'transit',
