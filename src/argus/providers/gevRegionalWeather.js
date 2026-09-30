@@ -83,7 +83,9 @@ export function createGevRegionalWeatherAdapter({
           ? payload.weather
           : normalizeRegionalWeather(payload?.weather ?? payload);
       if (!normalized?.observedAt) {
-        throw new TypeError('GEV regional weather payload has no usable observation');
+        throw new TypeError(
+          'GEV regional weather payload has no usable observation',
+        );
       }
 
       if (Number(limit) <= 0) return [];
