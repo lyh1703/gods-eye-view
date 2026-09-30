@@ -1,6 +1,7 @@
 export {
   UPSTREAM_GEV_CAPABILITY_INVENTORY,
   listUpstreamGevCapabilities,
+  getUpstreamGevCapability,
 } from './upstreamCapabilityInventory.js';
 export {
   ARGUS_NEXUS_QUERY_CONTRACT_ID,
@@ -52,3 +53,16 @@ export {
   USGS_EARTHQUAKES_PROVIDER,
   createUsgsEarthquakesAdapter,
 } from './providers/usgsEarthquakes.js';
+
+export {
+  GEV_OPENSKY_PROVIDER,
+  createGevOpenSkyAdapter,
+} from './providers/gevAviation.js';
+export {
+  GEV_REGIONAL_WEATHER_PROVIDER,
+  createGevRegionalWeatherAdapter,
+} from './providers/gevRegionalWeather.js';
+export {
+  GEV_TRAFFIC_PROVIDER,
+  createGevTrafficAdapter,
+} from './providers/gevTraffic.js';
