@@ -78,11 +78,26 @@ test('inventory code paths exist and lifecycle status cannot overclaim inherited
   }
 });
 
-test('only already-integrated earthquake capability is mapped before recovery adapters land', () => {
+test('recovered high-value providers are mapped without overclaiming operational status', () => {
   const mapped = listUpstreamGevCapabilities({ mapped_to_argus: true }).map(
     ({ capability_id }) => capability_id,
   );
-  assert.deepEqual(mapped, ['earthquakes']);
+  assert.deepEqual(mapped, [
+    'aviation-flights',
+    'regional-weather',
+    'traffic-flow',
+    'earthquakes',
+  ]);
+  for (const capabilityId of [
+    'aviation-flights',
+    'regional-weather',
+    'traffic-flow',
+  ]) {
+    const status = getUpstreamGevCapability(capabilityId)?.status;
+    assert.equal(status?.query_callable, true);
+    assert.equal(status?.validated, true);
+    assert.equal(status?.operational, false);
+  }
   assert.equal(getUpstreamGevCapability('earthquakes')?.status.operational, true);
 });
 
@@ -95,6 +110,6 @@ test('capability inventory supports domain and lifecycle filters', () => {
   );
   assert.equal(
     listUpstreamGevCapabilities({ query_callable: false }).length,
-    UPSTREAM_GEV_CAPABILITY_INVENTORY.length - 1,
+    UPSTREAM_GEV_CAPABILITY_INVENTORY.length - 4,
   );
 });
