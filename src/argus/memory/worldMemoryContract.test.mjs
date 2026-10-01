@@ -224,6 +224,22 @@ export function registerWorldMemoryRepositoryContract(label, makeContext) {
 
       const reread = await context.repository.getIngestionRun(RUN_ID);
       assert.equal(reread.completed_at, '2026-09-28T00:01:00.000Z');
+
+      await context.repository.saveIngestionRun({
+        ingestion_run_id: '00000000-0000-4000-8000-00000000a099',
+        provider_id: 'provider-a',
+        started_at: '2026-09-28T00:02:00Z',
+        completed_at: '2026-09-28T00:03:00Z',
+        status: 'FAILED',
+        metadata: { degraded: true },
+      });
+      const latest =
+        await context.repository.getLatestIngestionRunForProvider('provider-a');
+      assert.equal(
+        latest.ingestion_run_id,
+        '00000000-0000-4000-8000-00000000a099',
+      );
+      assert.equal(latest.status, 'FAILED');
     } finally {
       await context.cleanup?.();
     }

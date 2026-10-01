@@ -13,6 +13,7 @@ export const WORLD_MEMORY_REPOSITORY_METHODS = Object.freeze([
   'queryNearby',
   'saveIngestionRun',
   'getIngestionRun',
+  'getLatestIngestionRunForProvider',
 ]);
 
 const INGESTION_STATUSES = new Set([
@@ -430,6 +431,20 @@ export function createInMemoryWorldMemoryRepository({
     return cloneValue(ingestionRuns.get(id) ?? null);
   }
 
+  async function getLatestIngestionRunForProvider(providerId) {
+    const id = requireNonEmptyString(providerId, 'provider_id');
+    const candidates = [...ingestionRuns.values()]
+      .filter((run) => run.provider_id === id)
+      .sort((left, right) => {
+        const leftTime = Date.parse(left.completed_at ?? left.started_at ?? '');
+        const rightTime = Date.parse(
+          right.completed_at ?? right.started_at ?? '',
+        );
+        return rightTime - leftTime;
+      });
+    return cloneValue(candidates[0] ?? null);
+  }
+
   return Object.freeze({
     kind: 'in-memory',
     appendObservations,
@@ -438,6 +453,7 @@ export function createInMemoryWorldMemoryRepository({
     queryNearby,
     saveIngestionRun,
     getIngestionRun,
+    getLatestIngestionRunForProvider,
     observationCount: () => observationRecords.length,
     ingestionRunCount: () => ingestionRuns.size,
   });

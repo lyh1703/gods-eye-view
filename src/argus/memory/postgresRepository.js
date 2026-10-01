@@ -809,6 +809,21 @@ export function createPostgresWorldMemoryRepository({
     return result.rowCount === 0 ? null : mapIngestionRun(result.rows[0]);
   }
 
+  async function getLatestIngestionRunForProvider(providerId) {
+    const id = requireString(providerId, 'provider_id');
+    const result = await db.query(
+      `
+        SELECT *
+        FROM ${safeSchema}.ingestion_runs
+        WHERE provider_id = $1
+        ORDER BY COALESCE(completed_at, started_at) DESC, started_at DESC
+        LIMIT 1
+      `,
+      [id],
+    );
+    return result.rowCount === 0 ? null : mapIngestionRun(result.rows[0]);
+  }
+
   const repository = {
     kind: 'postgres',
     appendObservations,
@@ -817,6 +832,7 @@ export function createPostgresWorldMemoryRepository({
     queryNearby,
     saveIngestionRun,
     getIngestionRun,
+    getLatestIngestionRunForProvider,
   };
 
   return Object.freeze(validateWorldMemoryRepository(repository));

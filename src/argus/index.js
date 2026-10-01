@@ -66,3 +66,16 @@ export {
   GEV_TRAFFIC_PROVIDER,
   createGevTrafficAdapter,
 } from './providers/gevTraffic.js';
+
+export {
+  GEV_AIS_VESSELS_PROVIDER,
+  createGevAisVesselsAdapter,
+} from './providers/gevAisVessels.js';
+export {
+  GEV_FIRMS_FIRE_PROVIDER,
+  createGevFirmsFireAdapter,
+} from './providers/gevFirmsFire.js';
+export {
+  GEV_CELESTRAK_SATELLITES_PROVIDER,
+  createGevCelestrakSatellitesAdapter,
+} from './providers/gevCelestrakSatellites.js';

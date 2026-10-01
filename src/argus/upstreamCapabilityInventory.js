@@ -3,6 +3,7 @@ function capability({
   domain,
   code_paths,
   mapped_to_argus = false,
+  implemented = mapped_to_argus,
   query_callable = false,
   validated = false,
   operational = false,
@@ -10,6 +11,7 @@ function capability({
   const status = Object.freeze({
     inherited_present: true,
     mapped_to_argus,
+    implemented,
     query_callable,
     validated,
     operational,
@@ -20,9 +22,11 @@ function capability({
       ? 'validated'
       : query_callable
         ? 'query_callable'
-        : mapped_to_argus
-          ? 'mapped_to_argus'
-          : 'inherited_present';
+        : implemented
+          ? 'implemented'
+          : mapped_to_argus
+            ? 'mapped_to_argus'
+            : 'inherited_present';
 
   return Object.freeze({
     capability_id,
@@ -66,7 +70,11 @@ export const UPSTREAM_GEV_CAPABILITY_INVENTORY = Object.freeze([
       'src/layers/vessels/index.js',
       'server/providers/vessels/ais-live.js',
       'server/providers/vessels/ais-store.js',
+      'src/argus/providers/gevAisVessels.js',
     ],
+    mapped_to_argus: true,
+    implemented: true,
+    query_callable: true,
   }),
   capability({
     capability_id: 'weather-imagery',
@@ -160,7 +168,11 @@ export const UPSTREAM_GEV_CAPABILITY_INVENTORY = Object.freeze([
       'src/app/layers/firms.js',
       'src/layers/firms/index.js',
       'server/providers/firms.js',
+      'src/argus/providers/gevFirmsFire.js',
     ],
+    mapped_to_argus: true,
+    implemented: true,
+    query_callable: true,
   }),
   capability({
     capability_id: 'fire-perimeters',
@@ -199,7 +211,12 @@ export const UPSTREAM_GEV_CAPABILITY_INVENTORY = Object.freeze([
       'src/app/layers/satellites.js',
       'src/layers/satellites/index.js',
       'server/providers/space/celestrak.js',
+      'src/argus/providers/gevCelestrakSatellites.js',
     ],
+    mapped_to_argus: true,
+    implemented: true,
+    query_callable: true,
+    validated: true,
   }),
   capability({
     capability_id: 'rocket-launches',
@@ -296,6 +313,7 @@ export const UPSTREAM_GEV_CAPABILITY_INVENTORY = Object.freeze([
 export function listUpstreamGevCapabilities({
   domain,
   mapped_to_argus,
+  implemented,
   query_callable,
   validated,
   operational,
@@ -304,6 +322,7 @@ export function listUpstreamGevCapabilities({
     if (domain && capability.domain !== domain) return false;
     for (const [key, value] of Object.entries({
       mapped_to_argus,
+      implemented,
       query_callable,
       validated,
       operational,

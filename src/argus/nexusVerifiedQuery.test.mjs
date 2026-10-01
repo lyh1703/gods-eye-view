@@ -44,7 +44,25 @@ function worldFixture() {
             ingestion_run_id: id,
             provider_id: 'provider-a',
             status: 'SUCCEEDED',
-            metadata: { degraded: false, retry_count: 0 },
+            records_accepted: 1,
+            metadata: {
+              degraded: false,
+              retry_count: 0,
+              last_normal_observation_at: '2026-09-28T00:00:00Z',
+            },
+          };
+        },
+        async getLatestIngestionRunForProvider(providerId) {
+          return {
+            ingestion_run_id: '00000000-0000-4000-8000-00000000a001',
+            provider_id: providerId,
+            status: 'SUCCEEDED',
+            records_accepted: 1,
+            metadata: {
+              degraded: false,
+              retry_count: 0,
+              last_normal_observation_at: '2026-09-28T00:00:00Z',
+            },
           };
         },
       },
