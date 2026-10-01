@@ -195,7 +195,8 @@ test('World Memory deduplicates repeat AIS and keeps newer state over out-of-ord
     }),
   );
   const revision = await ingestor.ingest(olderAdapter, { limit: 10 });
-  assert.equal(revision.revisions, 1);
+  assert.equal(revision.revisions, 0);
+  assert.equal(revision.out_of_order, 1);
 
   const world = createWorldMemoryQueryEngine({ repository, now });
   const current = await world.get({
