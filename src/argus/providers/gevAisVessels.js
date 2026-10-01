@@ -15,7 +15,7 @@ export const GEV_AIS_VESSELS_PROVIDER = Object.freeze({
   attribution_required: true,
   retention_policy: 'retain normalized vessel observations; bounded source metadata only',
   reliability: 'inherited-gev-watchdog-and-stale-state',
-  adapter_status: 'argus-mapped-validated-internal',
+  adapter_status: 'argus-query-callable',
   source_url: 'https://aisstream.io/',
 });
 
