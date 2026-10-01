@@ -33,6 +33,8 @@ function errorSummary(error) {
   return {
     name: error?.name ?? 'Error',
     message: error?.message ?? String(error),
+    code: error?.code ?? null,
+    retryable: error?.retryable === true,
   };
 }
 
