@@ -111,6 +111,61 @@ function summarizeRun(run, ingestionRunId) {
   };
 }
 
+function providerRunState(run) {
+  if (!run) return 'UNKNOWN';
+  if (run.status === 'FAILED' || run.status === 'CANCELLED') {
+    return 'PROVIDER_FAILURE';
+  }
+  if (run.status === 'PARTIAL') return 'PARTIAL';
+  if (run.status === 'RUNNING') return 'RUNNING';
+  if (run.status === 'SUCCEEDED') {
+    if (Number(run.metadata?.stale_count) > 0) return 'STALE';
+    const accepted = Number(run.records_accepted ?? 0);
+    const duplicates = Number(run.metadata?.duplicates ?? 0);
+    const lastNormal = run.metadata?.last_normal_observation_at ?? null;
+    if (accepted === 0 && duplicates === 0 && !lastNormal) return 'NO_DATA';
+    return 'OK';
+  }
+  return 'UNKNOWN';
+}
+
+async function requestedProviderHealth(world, providerIds) {
+  if (!Array.isArray(providerIds) || providerIds.length === 0) return [];
+  const unique = [...new Set(providerIds.map(String))].filter(Boolean);
+  return Promise.all(
+    unique.map(async (providerId) => {
+      try {
+        const run =
+          await world.repository.getLatestIngestionRunForProvider(providerId);
+        return {
+          provider_id: providerId,
+          state: providerRunState(run),
+          run: summarizeRun(run, run?.ingestion_run_id ?? null),
+        };
+      } catch (error) {
+        return {
+          provider_id: providerId,
+          state: 'UNKNOWN',
+          run: {
+            ingestion_run_id: null,
+            provider_id: providerId,
+            status: 'UNKNOWN',
+            degraded: null,
+            started_at: null,
+            completed_at: null,
+            last_normal_observation_at: null,
+            retry_count: null,
+            error: {
+              name: error?.name ?? 'Error',
+              message: error?.message ?? String(error),
+            },
+          },
+        };
+      }
+    }),
+  );
+}
+
 async function referencedRunHealth(world, evidence) {
   const runs = [];
   for (const ingestionRunId of evidence.ingestion_run_ids) {
@@ -204,7 +259,22 @@ export function createNexusVerifiedQueryAdapter({ world } = {}) {
 
     requireObject(data, 'ARGUS query result');
     const evidence = validateEvidence(data.evidence);
-    const health = await referencedRunHealth(argus, evidence);
+    const [referencedHealth, requestedProviders] = await Promise.all([
+      referencedRunHealth(argus, evidence),
+      requestedProviderHealth(argus, request.provider_ids),
+    ]);
+    const requestedDegraded = requestedProviders.some((provider) =>
+      ['PROVIDER_FAILURE', 'PARTIAL', 'UNKNOWN'].includes(provider.state),
+    );
+    const health = {
+      ...referencedHealth,
+      requested_providers: requestedProviders,
+      partial_failure: requestedDegraded,
+      degraded:
+        referencedHealth.degraded === true || requestedDegraded
+          ? true
+          : referencedHealth.degraded,
+    };
 
     return {
       contract_id: ARGUS_NEXUS_QUERY_CONTRACT_ID,
