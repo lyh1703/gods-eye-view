@@ -169,6 +169,7 @@ export function createExternalProviderIngestor({
     const accepted = [];
     let duplicates = 0;
     let revisions = 0;
+    let outOfOrder = 0;
 
     for (const observation of observations) {
       const hash = await contentHash(observation);
@@ -178,15 +179,32 @@ export function createExternalProviderIngestor({
         provider_entity_id: observation.entity_id,
         observation_type: observation.observation_type,
         order: 'desc',
-        limit: 1,
+        limit: 100,
         time_basis: 'ingested',
       });
-      const previous = history[0] ?? null;
 
-      if (previous?.content_hash === hash) {
+      if (history.some((item) => item.content_hash === hash)) {
         duplicates += 1;
         continue;
       }
+
+      const previous = history.reduce((latest, item) => {
+        if (!latest) return item;
+        const latestObserved = Date.parse(latest.timestamp_observed ?? '');
+        const itemObserved = Date.parse(item.timestamp_observed ?? '');
+        if (!Number.isFinite(itemObserved)) return latest;
+        if (!Number.isFinite(latestObserved) || itemObserved > latestObserved) {
+          return item;
+        }
+        return latest;
+      }, null);
+      const incomingObserved = Date.parse(observation.timestamp_observed ?? '');
+      const previousObserved = Date.parse(previous?.timestamp_observed ?? '');
+      const isOutOfOrder =
+        previous &&
+        Number.isFinite(incomingObserved) &&
+        Number.isFinite(previousObserved) &&
+        incomingObserved < previousObserved;
 
       accepted.push({
         ...observation,
@@ -194,9 +212,12 @@ export function createExternalProviderIngestor({
         ingestion_run_id: runId,
         ingested_at: now().toISOString(),
         content_hash: hash,
-        supersedes_observation_id: previous?.observation_id ?? null,
+        supersedes_observation_id: isOutOfOrder
+          ? null
+          : previous?.observation_id ?? null,
       });
-      if (previous) revisions += 1;
+      if (isOutOfOrder) outOfOrder += 1;
+      else if (previous) revisions += 1;
     }
 
     try {
@@ -226,6 +247,7 @@ export function createExternalProviderIngestor({
           retry_count: Math.max(0, attemptsUsed - 1),
           duplicates,
           revisions,
+          out_of_order: outOfOrder,
           stale_count: staleCount,
           last_normal_observation_at:
             observations
@@ -243,6 +265,7 @@ export function createExternalProviderIngestor({
         inserted: persisted.inserted,
         duplicates,
         revisions,
+        out_of_order: outOfOrder,
         attempts: attemptsUsed,
         stale_count: staleCount,
         last_normal_observation_at:
