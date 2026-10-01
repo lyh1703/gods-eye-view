@@ -13,13 +13,17 @@ export const GEV_AIS_VESSELS_PROVIDER = Object.freeze({
   license_class: 'inherited-gev-source-license-review',
   commercial_allowed: null,
   attribution_required: true,
-  retention_policy: 'retain normalized vessel observations; bounded source metadata only',
+  retention_policy:
+    'retain normalized vessel observations; bounded source metadata only',
   reliability: 'inherited-gev-watchdog-and-stale-state',
   adapter_status: 'argus-query-callable',
   source_url: 'https://aisstream.io/',
 });
 
-function providerError(message, { name = 'ProviderError', retryable = false, code = null } = {}) {
+function providerError(
+  message,
+  { name = 'ProviderError', retryable = false, code = null } = {},
+) {
   const error = new Error(message);
   error.name = name;
   error.retryable = retryable;
@@ -45,7 +49,10 @@ function timeContains(observedMs, time) {
   if (!time) return true;
   const start = time.start == null ? -Infinity : Date.parse(time.start);
   const end = time.end == null ? Infinity : Date.parse(time.end);
-  if ((time.start != null && !Number.isFinite(start)) || (time.end != null && !Number.isFinite(end))) {
+  if (
+    (time.start != null && !Number.isFinite(start)) ||
+    (time.end != null && !Number.isFinite(end))
+  ) {
     throw new TypeError('time range must contain valid timestamps');
   }
   return observedMs >= start && observedMs <= end;
@@ -64,11 +71,24 @@ export function createGevAisVesselsAdapter({
   return Object.freeze({
     metadata: GEV_AIS_VESSELS_PROVIDER,
 
-    async query({ scope, time, filters = {}, limit = 100, ingestionRunId } = {}) {
-      if (filters.entity_type != null && filters.entity_type !== 'vessel') return [];
-      const maxRows = Math.max(1, Math.min(maxResponseRows, Math.max(Number(limit) || 100, 100)));
+    async query({
+      scope,
+      time,
+      filters = {},
+      limit = 100,
+      ingestionRunId,
+    } = {}) {
+      if (filters.entity_type != null && filters.entity_type !== 'vessel')
+        return [];
+      const maxRows = Math.max(
+        1,
+        Math.min(maxResponseRows, Math.max(Number(limit) || 100, 100)),
+      );
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), Math.max(1, Number(timeoutMs) || 10_000));
+      const timer = setTimeout(
+        () => controller.abort(),
+        Math.max(1, Number(timeoutMs) || 10_000),
+      );
       let response;
       try {
         response = await fetchImpl(`/api/ais-live?maxRows=${maxRows}`, {
@@ -112,14 +132,21 @@ export function createGevAisVesselsAdapter({
             code: 'CREDENTIAL_MISSING',
           });
         }
-        if (status === 'auth-failed' || response.status === 401 || response.status === 403) {
+        if (
+          status === 'auth-failed' ||
+          response.status === 401 ||
+          response.status === 403
+        ) {
           throw providerError('AIS provider credential rejected', {
             name: 'ProviderCredentialError',
             code: 'CREDENTIAL_REJECTED',
           });
         }
         throw providerError(`AIS provider HTTP ${response.status}`, {
-          retryable: response.status === 408 || response.status === 429 || response.status >= 500,
+          retryable:
+            response.status === 408 ||
+            response.status === 429 ||
+            response.status >= 500,
           code: response.status === 429 ? 'RATE_LIMIT' : 'HTTP_FAILURE',
         });
       }
@@ -148,12 +175,21 @@ export function createGevAisVesselsAdapter({
 
       const entityId =
         filters.entity_id == null ? null : String(filters.entity_id).trim();
-      const usable = snapshot.records.filter((record) => Number.isFinite(record.observedAtMs));
-      if (payload.rows.length > 0 && snapshot.records.length > 0 && usable.length === 0) {
-        throw providerError('AIS payload contained no valid observation timestamps', {
-          name: 'TypeError',
-          code: 'INVALID_TIMESTAMP',
-        });
+      const usable = snapshot.records.filter((record) =>
+        Number.isFinite(record.observedAtMs),
+      );
+      if (
+        payload.rows.length > 0 &&
+        snapshot.records.length > 0 &&
+        usable.length === 0
+      ) {
+        throw providerError(
+          'AIS payload contained no valid observation timestamps',
+          {
+            name: 'TypeError',
+            code: 'INVALID_TIMESTAMP',
+          },
+        );
       }
 
       return usable
