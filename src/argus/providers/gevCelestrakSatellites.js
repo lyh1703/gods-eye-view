@@ -22,7 +22,8 @@ export const GEV_CELESTRAK_SATELLITES_PROVIDER = Object.freeze({
   license_class: 'celestrak-source-terms',
   commercial_allowed: null,
   attribution_required: true,
-  retention_policy: 'retain normalized propagated state and bounded TLE reference metadata',
+  retention_policy:
+    'retain normalized propagated state and bounded TLE reference metadata',
   reliability: 'inherited-gev-cache-and-stale-fallback',
   adapter_status: 'argus-query-callable-public-source',
   source_url: 'https://celestrak.org/NORAD/elements/gp.php',
@@ -38,7 +39,10 @@ const ALLOWED_GROUPS = new Set([
   'starlink',
 ]);
 
-function providerError(message, { name = 'ProviderError', retryable = false, code = null } = {}) {
+function providerError(
+  message,
+  { name = 'ProviderError', retryable = false, code = null } = {},
+) {
   const error = new Error(message);
   error.name = name;
   error.retryable = retryable;
@@ -69,7 +73,11 @@ function tleEpochMs(line1) {
   const dayText = String(line1 || '').slice(20, 32);
   const shortYear = Number(yearText);
   const dayOfYear = Number(dayText);
-  if (!Number.isFinite(shortYear) || !Number.isFinite(dayOfYear) || dayOfYear <= 0) {
+  if (
+    !Number.isFinite(shortYear) ||
+    !Number.isFinite(dayOfYear) ||
+    dayOfYear <= 0
+  ) {
     return null;
   }
   const year = shortYear >= 57 ? 1900 + shortYear : 2000 + shortYear;
@@ -82,7 +90,9 @@ function propagateState(satrec, date) {
     if (!state.position || typeof state.position === 'boolean') return null;
     const geo = eciToGeodetic(state.position, gstime(date));
     const velocity =
-      state.velocity && typeof state.velocity !== 'boolean' ? state.velocity : null;
+      state.velocity && typeof state.velocity !== 'boolean'
+        ? state.velocity
+        : null;
     const speedMps = velocity
       ? Math.hypot(velocity.x, velocity.y, velocity.z) * 1000
       : null;
@@ -115,7 +125,10 @@ function timeContains(observedMs, time) {
   if (!time) return true;
   const start = time.start == null ? -Infinity : Date.parse(time.start);
   const end = time.end == null ? Infinity : Date.parse(time.end);
-  if ((time.start != null && !Number.isFinite(start)) || (time.end != null && !Number.isFinite(end))) {
+  if (
+    (time.start != null && !Number.isFinite(start)) ||
+    (time.end != null && !Number.isFinite(end))
+  ) {
     throw new TypeError('time range must contain valid timestamps');
   }
   return observedMs >= start && observedMs <= end;
@@ -134,8 +147,15 @@ export function createGevCelestrakSatellitesAdapter({
   return Object.freeze({
     metadata: GEV_CELESTRAK_SATELLITES_PROVIDER,
 
-    async query({ scope, time, filters = {}, limit = 100, ingestionRunId } = {}) {
-      if (filters.entity_type != null && filters.entity_type !== 'satellite') return [];
+    async query({
+      scope,
+      time,
+      filters = {},
+      limit = 100,
+      ingestionRunId,
+    } = {}) {
+      if (filters.entity_type != null && filters.entity_type !== 'satellite')
+        return [];
       const group = String(filters.group || 'stations').trim();
       if (!ALLOWED_GROUPS.has(group)) {
         throw providerError('Unsupported CelesTrak group', {
@@ -162,7 +182,10 @@ export function createGevCelestrakSatellitesAdapter({
       }
       if (!result.ok) {
         throw providerError(`CelesTrak provider HTTP ${result.status}`, {
-          retryable: result.status === 408 || result.status === 429 || result.status >= 500,
+          retryable:
+            result.status === 408 ||
+            result.status === 429 ||
+            result.status >= 500,
           code: result.status === 429 ? 'RATE_LIMIT' : 'HTTP_FAILURE',
         });
       }
@@ -199,7 +222,9 @@ export function createGevCelestrakSatellitesAdapter({
         if (!state || !bboxContains(state, scope?.bbox)) continue;
         const epochMs = tleEpochMs(entry.line1);
         const tleAgeSeconds =
-          epochMs == null ? null : Math.max(0, (receivedAt.getTime() - epochMs) / 1000);
+          epochMs == null
+            ? null
+            : Math.max(0, (receivedAt.getTime() - epochMs) / 1000);
         const staleTle = tleAgeSeconds == null || tleAgeSeconds > 72 * 3600;
 
         observations.push(
@@ -222,7 +247,8 @@ export function createGevCelestrakSatellitesAdapter({
               altitude_m: state.altitudeM,
               speed_mps: state.speedMps,
               propagation_model: 'SGP4',
-              tle_epoch: epochMs == null ? null : new Date(epochMs).toISOString(),
+              tle_epoch:
+                epochMs == null ? null : new Date(epochMs).toISOString(),
               tle_age_seconds: tleAgeSeconds,
               tle_stale: staleTle,
             },
@@ -230,10 +256,12 @@ export function createGevCelestrakSatellitesAdapter({
             confidence: staleTle ? 0.7 : 0.9,
             source_url: `${GEV_CELESTRAK_SATELLITES_PROVIDER.source_url}?GROUP=${encodeURIComponent(group)}&FORMAT=tle`,
             license_class: GEV_CELESTRAK_SATELLITES_PROVIDER.license_class,
-            commercial_allowed: GEV_CELESTRAK_SATELLITES_PROVIDER.commercial_allowed,
+            commercial_allowed:
+              GEV_CELESTRAK_SATELLITES_PROVIDER.commercial_allowed,
             attribution_required:
               GEV_CELESTRAK_SATELLITES_PROVIDER.attribution_required,
-            retention_policy: GEV_CELESTRAK_SATELLITES_PROVIDER.retention_policy,
+            retention_policy:
+              GEV_CELESTRAK_SATELLITES_PROVIDER.retention_policy,
             rate_limit_class: 'celestrak-six-hour-cache-policy',
             ingestion_run_id:
               ingestionRunId ?? `gev-celestrak-${receivedAt.toISOString()}`,
@@ -243,11 +271,19 @@ export function createGevCelestrakSatellitesAdapter({
         if (observations.length >= max) break;
       }
 
-      if (entries.length > 0 && observations.length === 0 && !entityId && !scope?.bbox) {
-        throw providerError('CelesTrak payload contained no propagatable satellites', {
-          name: 'TypeError',
-          code: 'MALFORMED_ORBIT_STATE',
-        });
+      if (
+        entries.length > 0 &&
+        observations.length === 0 &&
+        !entityId &&
+        !scope?.bbox
+      ) {
+        throw providerError(
+          'CelesTrak payload contained no propagatable satellites',
+          {
+            name: 'TypeError',
+            code: 'MALFORMED_ORBIT_STATE',
+          },
+        );
       }
       return observations;
     },
