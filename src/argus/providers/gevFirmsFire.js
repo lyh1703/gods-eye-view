@@ -20,7 +20,10 @@ export const GEV_FIRMS_FIRE_PROVIDER = Object.freeze({
   source_url: 'https://firms.modaps.eosdis.nasa.gov/',
 });
 
-function providerError(message, { name = 'ProviderError', retryable = false, code = null } = {}) {
+function providerError(
+  message,
+  { name = 'ProviderError', retryable = false, code = null } = {},
+) {
   const error = new Error(message);
   error.name = name;
   error.retryable = retryable;
@@ -34,14 +37,22 @@ function bboxContains(record, bbox) {
   if (![west, south, east, north].every(Number.isFinite)) {
     throw new TypeError('scope.bbox values must be finite');
   }
-  return record.lon >= west && record.lon <= east && record.lat >= south && record.lat <= north;
+  return (
+    record.lon >= west &&
+    record.lon <= east &&
+    record.lat >= south &&
+    record.lat <= north
+  );
 }
 
 function timeContains(observedMs, time) {
   if (!time) return true;
   const start = time.start == null ? -Infinity : Date.parse(time.start);
   const end = time.end == null ? Infinity : Date.parse(time.end);
-  if ((time.start != null && !Number.isFinite(start)) || (time.end != null && !Number.isFinite(end))) {
+  if (
+    (time.start != null && !Number.isFinite(start)) ||
+    (time.end != null && !Number.isFinite(end))
+  ) {
     throw new TypeError('time range must contain valid timestamps');
   }
   return observedMs >= start && observedMs <= end;
@@ -91,12 +102,24 @@ export function createGevFirmsFireAdapter({
   return Object.freeze({
     metadata: GEV_FIRMS_FIRE_PROVIDER,
 
-    async query({ scope, time, filters = {}, limit = 100, ingestionRunId } = {}) {
-      if (filters.entity_type != null && filters.entity_type !== 'fire-detection') {
+    async query({
+      scope,
+      time,
+      filters = {},
+      limit = 100,
+      ingestionRunId,
+    } = {}) {
+      if (
+        filters.entity_type != null &&
+        filters.entity_type !== 'fire-detection'
+      ) {
         return [];
       }
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), Math.max(1, Number(timeoutMs) || 60_000));
+      const timer = setTimeout(
+        () => controller.abort(),
+        Math.max(1, Number(timeoutMs) || 60_000),
+      );
       let response;
       try {
         response = await fetchImpl('/api/firms', {
@@ -137,7 +160,10 @@ export function createGevFirmsFireAdapter({
           });
         }
         throw providerError(`FIRMS provider HTTP ${response.status}`, {
-          retryable: response.status === 408 || response.status === 429 || response.status >= 500,
+          retryable:
+            response.status === 408 ||
+            response.status === 429 ||
+            response.status >= 500,
           code: response.status === 429 ? 'RATE_LIMIT' : 'HTTP_FAILURE',
         });
       }
@@ -148,17 +174,21 @@ export function createGevFirmsFireAdapter({
         });
       }
       if (payload.fires.length > maxResponseRecords) {
-        throw providerError('FIRMS provider response exceeds bounded record limit', {
-          name: 'RangeError',
-          code: 'OVERSIZED_RESPONSE',
-        });
+        throw providerError(
+          'FIRMS provider response exceeds bounded record limit',
+          {
+            name: 'RangeError',
+            code: 'OVERSIZED_RESPONSE',
+          },
+        );
       }
 
       const receivedAt = now();
       const entityId =
         filters.entity_id == null ? null : String(filters.entity_id).trim();
       const sourcePartial =
-        Array.isArray(payload.sources) && payload.sources.some((source) => source?.ok === false);
+        Array.isArray(payload.sources) &&
+        payload.sources.some((source) => source?.ok === false);
 
       let coordinateRows = 0;
       let timestampRows = 0;
@@ -233,10 +263,13 @@ export function createGevFirmsFireAdapter({
         });
       }
       if (coordinateRows > 0 && timestampRows === 0) {
-        throw providerError('FIRMS payload contained no valid detection timestamps', {
-          name: 'TypeError',
-          code: 'INVALID_TIMESTAMP',
-        });
+        throw providerError(
+          'FIRMS payload contained no valid detection timestamps',
+          {
+            name: 'TypeError',
+            code: 'INVALID_TIMESTAMP',
+          },
+        );
       }
 
       return observations;
