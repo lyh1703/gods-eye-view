@@ -43,12 +43,7 @@ jobs:
         run: npm run doctor -- --json
 
       - name: Check adopted formatting
-        run: |
-          if ! npm run format:check; then
-            npm run format
-            git --no-pager diff -- src/argus/externalProviderIngest.js src/argus/memory/repository.js src/argus/providers/gevAisVessels.js src/argus/providers/gevCelestrakSatellites.js src/argus/providers/gevFirmsFire.js src/argus/upstreamCapabilityInventory.js
-            exit 1
-          fi
+        run: npm run format:check
 
       - name: Check package boundaries
         run: npm run check:boundaries

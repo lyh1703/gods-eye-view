@@ -214,7 +214,7 @@ export function createExternalProviderIngestor({
         content_hash: hash,
         supersedes_observation_id: isOutOfOrder
           ? null
-          : previous?.observation_id ?? null,
+          : (previous?.observation_id ?? null),
       });
       if (isOutOfOrder) outOfOrder += 1;
       else if (previous) revisions += 1;

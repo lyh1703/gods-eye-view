@@ -104,11 +104,7 @@ test('recovered high-value providers are mapped without overclaiming operational
     assert.equal(status?.validated, true);
     assert.equal(status?.operational, false);
   }
-  for (const capabilityId of [
-    'ais-vessels',
-    'fire-firms',
-    'space-satellites',
-  ]) {
+  for (const capabilityId of ['ais-vessels', 'fire-firms']) {
     const status = getUpstreamGevCapability(capabilityId)?.status;
     assert.equal(status?.mapped_to_argus, true);
     assert.equal(status?.implemented, true);
@@ -116,6 +112,13 @@ test('recovered high-value providers are mapped without overclaiming operational
     assert.equal(status?.validated, false);
     assert.equal(status?.operational, false);
   }
+  const spaceStatus = getUpstreamGevCapability('space-satellites')?.status;
+  assert.equal(spaceStatus?.mapped_to_argus, true);
+  assert.equal(spaceStatus?.implemented, true);
+  assert.equal(spaceStatus?.query_callable, true);
+  assert.equal(spaceStatus?.validated, true);
+  assert.equal(spaceStatus?.operational, false);
+
   assert.equal(getUpstreamGevCapability('earthquakes')?.status.operational, true);
 });
 

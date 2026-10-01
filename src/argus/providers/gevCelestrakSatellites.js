@@ -25,7 +25,7 @@ export const GEV_CELESTRAK_SATELLITES_PROVIDER = Object.freeze({
   retention_policy:
     'retain normalized propagated state and bounded TLE reference metadata',
   reliability: 'inherited-gev-cache-and-stale-fallback',
-  adapter_status: 'argus-query-callable-public-source',
+  adapter_status: 'argus-validated-public-e2e',
   source_url: 'https://celestrak.org/NORAD/elements/gp.php',
 });
 
