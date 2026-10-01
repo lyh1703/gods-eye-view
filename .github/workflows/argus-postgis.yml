@@ -100,10 +100,18 @@ jobs:
       - name: Run external provider contract suite
         run: node --test src/argus/externalProviderIngest.test.mjs
 
+      - name: Run AIS FIRMS Space recovery contract suite
+        run: node --test src/argus/capabilityRecoveryD2.test.mjs
+
       - name: Run live USGS to PostGIS E2E gate
         env:
           ARGUS_POSTGRES_TEST_URL: postgresql://argus:argus@127.0.0.1:5432/argus_test
         run: node --test src/argus/externalProviderIngest.postgres.test.mjs
+
+      - name: Run public CelesTrak to PostGIS NEXUS E2E gate
+        env:
+          ARGUS_POSTGRES_TEST_URL: postgresql://argus:argus@127.0.0.1:5432/argus_test
+        run: node --test src/argus/celestrakPublic.postgres.test.mjs
 
       - name: Run ARGUS to NEXUS verified-query E2E gate
         env:
