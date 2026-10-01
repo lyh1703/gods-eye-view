@@ -437,7 +437,9 @@ export function createInMemoryWorldMemoryRepository({
       .filter((run) => run.provider_id === id)
       .sort((left, right) => {
         const leftTime = Date.parse(left.completed_at ?? left.started_at ?? '');
-        const rightTime = Date.parse(right.completed_at ?? right.started_at ?? '');
+        const rightTime = Date.parse(
+          right.completed_at ?? right.started_at ?? '',
+        );
         return rightTime - leftTime;
       });
     return cloneValue(candidates[0] ?? null);
