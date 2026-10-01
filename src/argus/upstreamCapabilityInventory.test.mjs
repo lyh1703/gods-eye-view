@@ -65,6 +65,9 @@ test('inventory code paths exist and lifecycle status cannot overclaim inherited
       assert.equal(capability.status.query_callable, true);
     }
     if (capability.status.query_callable) {
+      assert.equal(capability.status.implemented, true);
+    }
+    if (capability.status.implemented) {
       assert.equal(capability.status.mapped_to_argus, true);
     }
 
@@ -84,9 +87,12 @@ test('recovered high-value providers are mapped without overclaiming operational
   );
   assert.deepEqual(mapped, [
     'aviation-flights',
+    'ais-vessels',
     'regional-weather',
     'traffic-flow',
+    'fire-firms',
     'earthquakes',
+    'space-satellites',
   ]);
   for (const capabilityId of [
     'aviation-flights',
@@ -96,6 +102,18 @@ test('recovered high-value providers are mapped without overclaiming operational
     const status = getUpstreamGevCapability(capabilityId)?.status;
     assert.equal(status?.query_callable, true);
     assert.equal(status?.validated, true);
+    assert.equal(status?.operational, false);
+  }
+  for (const capabilityId of [
+    'ais-vessels',
+    'fire-firms',
+    'space-satellites',
+  ]) {
+    const status = getUpstreamGevCapability(capabilityId)?.status;
+    assert.equal(status?.mapped_to_argus, true);
+    assert.equal(status?.implemented, true);
+    assert.equal(status?.query_callable, true);
+    assert.equal(status?.validated, false);
     assert.equal(status?.operational, false);
   }
   assert.equal(getUpstreamGevCapability('earthquakes')?.status.operational, true);
@@ -110,6 +128,6 @@ test('capability inventory supports domain and lifecycle filters', () => {
   );
   assert.equal(
     listUpstreamGevCapabilities({ query_callable: false }).length,
-    UPSTREAM_GEV_CAPABILITY_INVENTORY.length - 4,
+    UPSTREAM_GEV_CAPABILITY_INVENTORY.length - 7,
   );
 });
