@@ -16,7 +16,7 @@ export const GEV_FIRMS_FIRE_PROVIDER = Object.freeze({
   attribution_required: true,
   retention_policy: 'retain normalized detections and bounded source evidence',
   reliability: 'inherited-gev-partial-source-and-stale-cache',
-  adapter_status: 'argus-mapped-validated-internal',
+  adapter_status: 'argus-query-callable',
   source_url: 'https://firms.modaps.eosdis.nasa.gov/',
 });
 
