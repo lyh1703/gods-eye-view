@@ -47,6 +47,19 @@ function timeContains(observedMs, time) {
   return observedMs >= start && observedMs <= end;
 }
 
+function finiteNumber(value) {
+  if (
+    value === null ||
+    value === undefined ||
+    value === '' ||
+    typeof value === 'boolean'
+  ) {
+    return null;
+  }
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
 function detectionId(record) {
   const parts = [
     record.satellite || 'unknown-satellite',
@@ -153,9 +166,16 @@ export function createGevFirmsFireAdapter({
       const max = Math.max(0, Math.min(Number(limit) || 100, 10_000));
 
       for (const record of payload.fires) {
-        const lat = Number(record?.lat);
-        const lon = Number(record?.lon);
-        if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+        const lat = finiteNumber(record?.lat);
+        const lon = finiteNumber(record?.lon);
+        if (
+          lat == null ||
+          lon == null ||
+          Math.abs(lat) > 90 ||
+          Math.abs(lon) > 180
+        ) {
+          continue;
+        }
         coordinateRows += 1;
 
         const observedMs = acquisitionMsUtc(record.acqDate, record.acqTime);
@@ -183,10 +203,8 @@ export function createGevFirmsFireAdapter({
               source_sensor: sourceName(record),
               source_native_confidence: record.confidence ?? null,
               source_quality_normalized: normalizeConfidence(record.confidence),
-              frp_mw: Number.isFinite(Number(record.frp)) ? Number(record.frp) : null,
-              brightness: Number.isFinite(Number(record.brightness))
-                ? Number(record.brightness)
-                : null,
+              frp_mw: finiteNumber(record.frp),
+              brightness: finiteNumber(record.brightness),
               day_night: record.daynight || null,
               acquisition_date: record.acqDate || null,
               acquisition_time_utc: String(record.acqTime ?? ''),
