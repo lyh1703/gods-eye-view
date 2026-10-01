@@ -25,8 +25,8 @@ function capability({
         : implemented
           ? 'implemented'
           : mapped_to_argus
-          ? 'mapped_to_argus'
-          : 'inherited_present';
+            ? 'mapped_to_argus'
+            : 'inherited_present';
 
   return Object.freeze({
     capability_id,
