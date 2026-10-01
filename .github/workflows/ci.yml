@@ -46,7 +46,7 @@ jobs:
         run: |
           if ! npm run format:check; then
             npm run format
-            git --no-pager diff -- src/argus/memory/repository.js src/argus/providers/gevAisVessels.js src/argus/providers/gevCelestrakSatellites.js src/argus/providers/gevFirmsFire.js src/argus/upstreamCapabilityInventory.js
+            git --no-pager diff -- src/argus/externalProviderIngest.js src/argus/memory/repository.js src/argus/providers/gevAisVessels.js src/argus/providers/gevCelestrakSatellites.js src/argus/providers/gevFirmsFire.js src/argus/upstreamCapabilityInventory.js
             exit 1
           fi
 
