@@ -261,7 +261,10 @@ export function createNexusVerifiedQueryAdapter({ world } = {}) {
     const evidence = validateEvidence(data.evidence);
     const [referencedHealth, requestedProviders] = await Promise.all([
       referencedRunHealth(argus, evidence),
-      requestedProviderHealth(argus, request.provider_ids),
+      requestedProviderHealth(
+        argus,
+        request.provider_ids ?? request.identity?.provider_ids,
+      ),
     ]);
     const requestedDegraded = requestedProviders.some((provider) =>
       ['PROVIDER_FAILURE', 'PARTIAL', 'UNKNOWN'].includes(provider.state),
