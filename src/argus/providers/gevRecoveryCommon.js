@@ -9,7 +9,13 @@ export function recoveryError(code, message, retryable = false) {
 }
 
 export function finiteCoordinate(value, max) {
-  if (value === null || value === undefined || value === '' || typeof value === 'boolean') return null;
+  if (
+    value === null ||
+    value === undefined ||
+    value === '' ||
+    typeof value === 'boolean'
+  )
+    return null;
   const result = Number(value);
   return Number.isFinite(result) && Math.abs(result) <= max ? result : null;
 }
@@ -17,8 +23,12 @@ export function finiteCoordinate(value, max) {
 export function inArea(lon, lat, scope) {
   const bbox = scope?.bbox;
   if (!bbox) return true;
-  if (!Array.isArray(bbox) || bbox.length !== 4 ||
-      bbox.some((n) => !Number.isFinite(n))) throw new TypeError('invalid bbox');
+  if (
+    !Array.isArray(bbox) ||
+    bbox.length !== 4 ||
+    bbox.some((n) => !Number.isFinite(n))
+  )
+    throw new TypeError('invalid bbox');
   const [west, south, east, north] = bbox;
   return lat >= south && lat <= north && lon >= west && lon <= east;
 }
@@ -47,20 +57,33 @@ export async function deadline(operation, timeoutMs = 12_000) {
     if (controller.signal.aborted || error?.name === 'AbortError')
       throw recoveryError('TIMEOUT', 'provider timed out', true);
     if (error?.code) throw error;
-    throw recoveryError('PROVIDER_FAILURE', error?.message || 'provider unavailable', true);
+    throw recoveryError(
+      'PROVIDER_FAILURE',
+      error?.message || 'provider unavailable',
+      true,
+    );
   } finally {
     clearTimeout(timer);
   }
 }
 
 export async function boundedJson(response, maxBytes = 2_000_000) {
-  if (response.status === 429) throw recoveryError('RATE_LIMIT', 'provider rate limited', true);
+  if (response.status === 429)
+    throw recoveryError('RATE_LIMIT', 'provider rate limited', true);
   if (response.status === 401 || response.status === 403)
-    throw recoveryError('ACCESS_DENIED', 'provider credential or access denied');
+    throw recoveryError(
+      'ACCESS_DENIED',
+      'provider credential or access denied',
+    );
   if (!response.ok)
-    throw recoveryError('PROVIDER_FAILURE', `provider HTTP ${response.status}`, response.status >= 500);
+    throw recoveryError(
+      'PROVIDER_FAILURE',
+      `provider HTTP ${response.status}`,
+      response.status >= 500,
+    );
   const header = Number(response.headers?.get?.('content-length'));
-  if (header > maxBytes) throw recoveryError('OVERSIZED_RESPONSE', 'provider result exceeds limit');
+  if (header > maxBytes)
+    throw recoveryError('OVERSIZED_RESPONSE', 'provider result exceeds limit');
   let payload;
   try {
     payload = await response.json();
@@ -68,13 +91,25 @@ export async function boundedJson(response, maxBytes = 2_000_000) {
     throw recoveryError('MALFORMED_PAYLOAD', 'provider JSON malformed');
   }
   const bytes = new TextEncoder().encode(JSON.stringify(payload)).byteLength;
-  if (bytes > maxBytes) throw recoveryError('OVERSIZED_RESPONSE', 'provider result exceeds limit');
+  if (bytes > maxBytes)
+    throw recoveryError('OVERSIZED_RESPONSE', 'provider result exceeds limit');
   return payload;
 }
 
 export function pointObservation({
-  metadata, id, type, observationType, timestamp, receivedAt, lon, lat,
-  properties, ingestionRunId, rawReference, confidence = null, sourceUrl = null,
+  metadata,
+  id,
+  type,
+  observationType,
+  timestamp,
+  receivedAt,
+  lon,
+  lat,
+  properties,
+  ingestionRunId,
+  rawReference,
+  confidence = null,
+  sourceUrl = null,
 }) {
   return createObservationEnvelope({
     provider_id: metadata.provider_id,

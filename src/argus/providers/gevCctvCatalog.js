@@ -1,7 +1,13 @@
 import { createCctvSource } from '../../layers/cctv/source.js';
 import {
-  recoveryError, finiteCoordinate, inArea, inTime, boundedLimit,
-  deadline, boundedJson, pointObservation,
+  recoveryError,
+  finiteCoordinate,
+  inArea,
+  inTime,
+  boundedLimit,
+  deadline,
+  boundedJson,
+  pointObservation,
 } from './gevRecoveryCommon.js';
 
 export const GEV_CCTV_CATALOG_PROVIDER = Object.freeze({
@@ -34,22 +40,39 @@ export function createGevCctvCatalogAdapter({
     fetchImpl: async (url, init) => {
       const response = await fetchImpl(url, init);
       const payload = await boundedJson(response, 3_000_000);
-      return { ok: true, async json() { return payload; } };
+      return {
+        ok: true,
+        async json() {
+          return payload;
+        },
+      };
     },
   });
   return Object.freeze({
     metadata: GEV_CCTV_CATALOG_PROVIDER,
-    async query({ scope, time, filters = {}, limit = 100, ingestionRunId } = {}) {
-      if (filters.entity_type && filters.entity_type !== 'cctv-camera') return [];
+    async query({
+      scope,
+      time,
+      filters = {},
+      limit = 100,
+      ingestionRunId,
+    } = {}) {
+      if (filters.entity_type && filters.entity_type !== 'cctv-camera')
+        return [];
       return deadline(async (signal) => {
         const catalog = await source.getCatalog({ signal });
         if (catalog.sources.length > maxRows)
-          throw recoveryError('OVERSIZED_RESPONSE', 'camera catalog exceeds row limit');
+          throw recoveryError(
+            'OVERSIZED_RESPONSE',
+            'camera catalog exceeds row limit',
+          );
         let healthById = new Map();
         let healthUnavailable = false;
         try {
           const health = await source.getHealth({ signal });
-          healthById = new Map(health.cameras.map((entry) => [String(entry.id), entry]));
+          healthById = new Map(
+            health.cameras.map((entry) => [String(entry.id), entry]),
+          );
         } catch {
           healthUnavailable = true;
         }
@@ -66,32 +89,42 @@ export function createGevCctvCatalogAdapter({
           if (filters.entity_id && filters.entity_id !== id) continue;
           if (!inArea(lon, lat, scope)) continue;
           const health = healthById.get(id);
-          const synthetic = ['fallback', 'synthetic'].includes(String(record.sourceKind || '').toLowerCase());
-          observations.push(pointObservation({
-            metadata: GEV_CCTV_CATALOG_PROVIDER,
-            id, type: 'cctv-camera', observationType: 'cctv-catalog-status',
-            timestamp: receivedAt, receivedAt, lon, lat, ingestionRunId,
-            properties: {
-              name: String(record.name || '').slice(0, 160),
-              city: String(record.city || '').slice(0, 100),
-              source_provider: String(record.provider || '').slice(0, 140),
-              source_kind: record.sourceKind ?? null,
-              source_license: record.license ?? null,
-              credit: record.credit ?? null,
-              feed_type: record.feedType ?? null,
-              availability: healthUnavailable
-                ? 'HEALTH_UNAVAILABLE'
-                : health?.status ?? 'NOT_PROBED',
-              last_health_check: Number.isFinite(health?.updatedAt)
-                ? new Date(health.updatedAt).toISOString()
-                : null,
-              stream_verified: false,
-              synthetic_or_fallback: synthetic,
-              observation_basis: 'catalog-sample-not-live-frame',
-            },
-            confidence: synthetic ? 0.3 : 0.7,
-            rawReference: `catalog:${id}`,
-          }));
+          const synthetic = ['fallback', 'synthetic'].includes(
+            String(record.sourceKind || '').toLowerCase(),
+          );
+          observations.push(
+            pointObservation({
+              metadata: GEV_CCTV_CATALOG_PROVIDER,
+              id,
+              type: 'cctv-camera',
+              observationType: 'cctv-catalog-status',
+              timestamp: receivedAt,
+              receivedAt,
+              lon,
+              lat,
+              ingestionRunId,
+              properties: {
+                name: String(record.name || '').slice(0, 160),
+                city: String(record.city || '').slice(0, 100),
+                source_provider: String(record.provider || '').slice(0, 140),
+                source_kind: record.sourceKind ?? null,
+                source_license: record.license ?? null,
+                credit: record.credit ?? null,
+                feed_type: record.feedType ?? null,
+                availability: healthUnavailable
+                  ? 'HEALTH_UNAVAILABLE'
+                  : (health?.status ?? 'NOT_PROBED'),
+                last_health_check: Number.isFinite(health?.updatedAt)
+                  ? new Date(health.updatedAt).toISOString()
+                  : null,
+                stream_verified: false,
+                synthetic_or_fallback: synthetic,
+                observation_basis: 'catalog-sample-not-live-frame',
+              },
+              confidence: synthetic ? 0.3 : 0.7,
+              rawReference: `catalog:${id}`,
+            }),
+          );
           if (observations.length >= boundedLimit(limit)) break;
         }
         return observations;
