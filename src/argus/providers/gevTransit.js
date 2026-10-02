@@ -26,7 +26,7 @@ export const GEV_PUBLIC_TRANSIT_PROVIDER = Object.freeze({
   retention_policy: 'bounded normalized vehicle position/route evidence only',
   rate_limit_class: 'inherited-transit-proxy-admission',
   reliability: 'operator feed timestamps may lag cached receipt time',
-  adapter_status: 'argus-query-callable',
+  adapter_status: 'argus-validated-public-e2e',
   source_url: 'https://gtfs.org/documentation/realtime/reference/',
 });
 

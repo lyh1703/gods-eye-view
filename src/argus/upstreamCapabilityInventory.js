@@ -132,6 +132,7 @@ export const UPSTREAM_GEV_CAPABILITY_INVENTORY = Object.freeze([
     mapped_to_argus: true,
     implemented: true,
     query_callable: true,
+    validated: true,
   }),
   capability({
     capability_id: 'bikeshare',
