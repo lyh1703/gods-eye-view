@@ -96,10 +96,8 @@ export function createGevTransitAdapter({
           const entityId = `${feedId}:${id}`;
           if (filters.entity_id && filters.entity_id !== entityId) continue;
           if (!inArea(lon, lat, scope)) continue;
-          const observedAt =
-            normalizeEpochSeconds(item.timestamp) ||
-            feedTimestamp ||
-            receiptStamp;
+          const vehicleTimestamp = normalizeEpochSeconds(item.timestamp);
+          const observedAt = vehicleTimestamp || feedTimestamp || receiptStamp;
           if (!inTime(observedAt, time)) continue;
           observations.push(
             pointObservation({
@@ -123,8 +121,9 @@ export function createGevTransitAdapter({
                   : null,
                 course_deg: Number.isFinite(item.bearing) ? item.bearing : null,
                 vehicle_status: item.status ?? null,
-                timestamp_source:
-                  item.timestampSource || (feedTimestamp ? 'feed' : 'receipt'),
+                timestamp_source: vehicleTimestamp
+                  ? (item.timestampSource || 'vehicle')
+                  : (feedTimestamp ? 'feed' : 'receipt'),
                 feed_timestamp: feedTimestamp,
                 fetched_at: receiptStamp,
                 proxy_stale: staleProxy,

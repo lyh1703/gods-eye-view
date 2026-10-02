@@ -97,9 +97,11 @@ test('G adapters reuse inherited registry and preserve catalog vs live evidence'
 });
 
 test('G adapters persist in World Memory and NEXUS reports failures separately from stored evidence', async () => {
-  const repository = createInMemoryWorldMemoryRepository({ now: () => NOW });
+  let clockMs = NOW.getTime();
+  const clock = () => new Date(clockMs);
+  const repository = createInMemoryWorldMemoryRepository({ now: clock });
   const ingestor = createExternalProviderIngestor({
-    repository, now: () => NOW, uuid: ids(), maxAttempts: 1,
+    repository, now: clock, uuid: ids(), maxAttempts: 1,
     staleAfterSeconds: 600,
   });
   for (const adapter of adapters()) {
@@ -108,13 +110,14 @@ test('G adapters persist in World Memory and NEXUS reports failures separately f
     const repeated = await ingestor.ingest(adapter, { filters: { feed_id: 'mbta' }, limit: 20 });
     assert.equal(repeated.duplicates, 1);
   }
+  clockMs += 1000;
   const failRadio = adapters({ radioStatus: 503 })[2];
   const failure = await ingestor.ingest(failRadio);
   assert.equal(failure.status, 'DEGRADED');
   assert.equal(failure.error.code, 'PROVIDER_FAILURE');
 
   const nexus = createNexusVerifiedQueryAdapter({
-    world: createWorldMemoryQueryEngine({ repository, now: () => NOW }),
+    world: createWorldMemoryQueryEngine({ repository, now: clock }),
   });
   const result = await nexus.execute({
     operation: 'query', area: AREA,
@@ -158,7 +161,7 @@ test('G failure QA distinguishes no data, source down, access refused, malformed
     feedTimestamp: null,
   } })[1];
   const record = (await invalidTime.query({ filters: { feed_id: 'mbta' } }))[0];
-  assert.equal(record.properties.timestamp_source, 'vehicle');
+  assert.equal(record.properties.timestamp_source, 'receipt');
   const rateLimited = createGevRadioDirectoryAdapter({ fetchImpl: async () => response({}, 429) });
   await assert.rejects(() => rateLimited.query(), (e) => e.code === 'RATE_LIMIT');
   const badRadio = adapters({ radioSnapshot: {
