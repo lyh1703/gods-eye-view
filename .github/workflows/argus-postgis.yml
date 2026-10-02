@@ -9,6 +9,7 @@ on:
       - 'src/argus/providers/**'
       - 'src/argus/externalProviderIngest*'
       - 'src/argus/nexusVerifiedQuery*'
+      - 'src/argus/multiSourceFusion*'
       - '.github/workflows/argus-postgis.yml'
   workflow_dispatch:
 
@@ -99,6 +100,14 @@ jobs:
 
       - name: Run external provider contract suite
         run: node --test src/argus/externalProviderIngest.test.mjs
+
+      - name: Run fusion reliability contract and labeled benchmark
+        run: node --test src/argus/multiSourceFusion.test.mjs
+
+      - name: Run multi-source fusion PostGIS and real USGS plus MBTA gate
+        env:
+          ARGUS_POSTGRES_TEST_URL: postgresql://argus:argus@127.0.0.1:5432/argus_test
+        run: node --test src/argus/multiSourceFusion.postgres.test.mjs
 
       - name: Run AIS FIRMS Space recovery contract suite
         run: node --test src/argus/capabilityRecoveryD2.test.mjs
