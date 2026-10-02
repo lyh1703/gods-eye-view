@@ -1,7 +1,4 @@
-import {
-  haversineDistanceKm,
-  pointCoordinates,
-} from './worldOperations.js';
+import { haversineDistanceKm, pointCoordinates } from './worldOperations.js';
 
 // A bounded, read-only evidence comparison. It is NOT an entity linker or
 // causal/event identity inference engine.
@@ -58,7 +55,8 @@ function horizontalAccuracyKm(observation) {
 
 function provenance(observation) {
   const properties = observation?.properties ?? {};
-  const origin = nonEmpty(properties.original_source_id) ||
+  const origin =
+    nonEmpty(properties.original_source_id) ||
     nonEmpty(properties.source_origin_id) ||
     nonEmpty(properties.upstream_source_id);
   if (origin) return { key: `declared:${origin}`, basis: 'declared-origin-id' };
@@ -94,10 +92,16 @@ function claimConflict(left, right) {
   const a = left.observation.properties?.fusion_claim;
   const b = right.observation.properties?.fusion_claim;
   if (
-    !a || !b || typeof a !== 'object' || typeof b !== 'object' ||
-    !nonEmpty(a.kind) || a.kind !== b.kind ||
-    a.value === undefined || b.value === undefined
-  ) return false;
+    !a ||
+    !b ||
+    typeof a !== 'object' ||
+    typeof b !== 'object' ||
+    !nonEmpty(a.kind) ||
+    a.kind !== b.kind ||
+    a.value === undefined ||
+    b.value === undefined
+  )
+    return false;
   // Compare only an explicitly matching measurement kind, never unrelated
   // arbitrary provider-specific properties (such as radio codec vs route ID).
   return JSON.stringify(a.value) !== JSON.stringify(b.value);
@@ -107,12 +111,15 @@ function comparison(left, right, { maxDistanceKm, maxTimeDeltaSeconds }) {
   if (
     left.observation.entity_type !== right.observation.entity_type ||
     left.observation.observation_type !== right.observation.observation_type
-  ) return null;
+  )
+    return null;
   if (left.observation.provider_id === right.observation.provider_id)
     return null;
 
-  const sameCanonical = nonEmpty(left.observation.canonical_entity_id) &&
-    left.observation.canonical_entity_id === right.observation.canonical_entity_id;
+  const sameCanonical =
+    nonEmpty(left.observation.canonical_entity_id) &&
+    left.observation.canonical_entity_id ===
+      right.observation.canonical_entity_id;
   const differentCanonical =
     nonEmpty(left.observation.canonical_entity_id) &&
     nonEmpty(right.observation.canonical_entity_id) &&
@@ -121,28 +128,31 @@ function comparison(left, right, { maxDistanceKm, maxTimeDeltaSeconds }) {
 
   const seconds = Math.abs(left.observedMs - right.observedMs) / 1000;
   if (seconds > maxTimeDeltaSeconds) return null;
-  const distance = left.point && right.point
-    ? haversineDistanceKm(left.point, right.point)
-    : null;
+  const distance =
+    left.point && right.point
+      ? haversineDistanceKm(left.point, right.point)
+      : null;
   if (!sameCanonical && (distance == null || distance > maxDistanceKm))
     return null;
 
   const sameOrigin = left.origin.key && left.origin.key === right.origin.key;
-  const independence =
-    sameOrigin ? 'SAME_UPSTREAM'
-      : left.origin.basis === 'declared-origin-id' &&
-          right.origin.basis === 'declared-origin-id'
-        ? 'DISTINCT_DECLARED_ORIGINS'
-        : 'UNVERIFIED';
+  const independence = sameOrigin
+    ? 'SAME_UPSTREAM'
+    : left.origin.basis === 'declared-origin-id' &&
+        right.origin.basis === 'declared-origin-id'
+      ? 'DISTINCT_DECLARED_ORIGINS'
+      : 'UNVERIFIED';
 
-  const accuracySum = left.accuracyKm != null && right.accuracyKm != null
-    ? left.accuracyKm + right.accuracyKm
-    : null;
+  const accuracySum =
+    left.accuracyKm != null && right.accuracyKm != null
+      ? left.accuracyKm + right.accuracyKm
+      : null;
   const precisionUnknown = accuracySum == null;
-  const spatialAmbiguous = accuracySum != null &&
-    accuracySum > maxDistanceKm;
-  const locationConflict = sameCanonical &&
-    distance != null && accuracySum != null &&
+  const spatialAmbiguous = accuracySum != null && accuracySum > maxDistanceKm;
+  const locationConflict =
+    sameCanonical &&
+    distance != null &&
+    accuracySum != null &&
     distance > maxDistanceKm + accuracySum;
   const conflictingClaim = sameCanonical && claimConflict(left, right);
   let status = 'PROXIMITY_ONLY';
@@ -150,8 +160,12 @@ function comparison(left, right, { maxDistanceKm, maxTimeDeltaSeconds }) {
     if (locationConflict || conflictingClaim) status = 'CONFLICT';
     else if (sameOrigin) status = 'SAME_UPSTREAM';
     else if (left.stale || right.stale) status = 'STALE_COMPARISON';
-    else if (distance == null || precisionUnknown || spatialAmbiguous ||
-      independence !== 'DISTINCT_DECLARED_ORIGINS') {
+    else if (
+      distance == null ||
+      precisionUnknown ||
+      spatialAmbiguous ||
+      independence !== 'DISTINCT_DECLARED_ORIGINS'
+    ) {
       status = 'INSUFFICIENT_EVIDENCE';
     } else if (distance <= maxDistanceKm + accuracySum) {
       status = 'CONSISTENT_REPORTS';
@@ -164,7 +178,8 @@ function comparison(left, right, { maxDistanceKm, maxTimeDeltaSeconds }) {
   return {
     status,
     identity_basis: sameCanonical
-      ? 'shared-canonical-entity-id' : 'spatiotemporal-proximity-only',
+      ? 'shared-canonical-entity-id'
+      : 'spatiotemporal-proximity-only',
     independence,
     temporal_delta_seconds: seconds,
     distance_km: distance,
@@ -179,13 +194,16 @@ function comparison(left, right, { maxDistanceKm, maxTimeDeltaSeconds }) {
   };
 }
 
-export function fuseObservations(observations, {
-  now = new Date(),
-  maxDistanceKm = 5,
-  maxTimeDeltaSeconds = 300,
-  staleAfterSeconds = 900,
-  providerHealth = [],
-} = {}) {
+export function fuseObservations(
+  observations,
+  {
+    now = new Date(),
+    maxDistanceKm = 5,
+    maxTimeDeltaSeconds = 300,
+    staleAfterSeconds = 900,
+    providerHealth = [],
+  } = {},
+) {
   if (!Array.isArray(observations) || observations.length > 300)
     throw new RangeError('fusion requires at most 300 observations');
   const clock = now instanceof Date ? now.getTime() : Date.parse(now);
@@ -211,8 +229,12 @@ export function fuseObservations(observations, {
     const type = nonEmpty(observation?.entity_type);
     const observationType = nonEmpty(observation?.observation_type);
     if (
-      !id || !provider || !type || !observationType ||
-      observedMs == null || receivedMs == null
+      !id ||
+      !provider ||
+      !type ||
+      !observationType ||
+      observedMs == null ||
+      receivedMs == null
     ) {
       excluded.push({
         observation_id: observation?.observation_id ?? null,
@@ -236,8 +258,12 @@ export function fuseObservations(observations, {
       continue;
     }
     const key = JSON.stringify([
-      provider, id, observationType, observedMs,
-      point, observation.content_hash ?? null,
+      provider,
+      id,
+      observationType,
+      observedMs,
+      point,
+      observation.content_hash ?? null,
     ]);
     if (seen.has(key)) {
       duplicateCount += 1;
@@ -246,46 +272,57 @@ export function fuseObservations(observations, {
     seen.add(key);
     const age = Math.max(0, (clock - observedMs) / 1000);
     accepted.push({
-      observation, point, observedMs, receivedMs,
+      observation,
+      point,
+      observedMs,
+      receivedMs,
       origin: provenance(observation),
       accuracyKm: horizontalAccuracyKm(observation),
       stale: age > staleAfterSeconds,
     });
   }
 
-  accepted.sort((a, b) =>
-    a.observedMs - b.observedMs ||
-    String(a.observation.provider_id).localeCompare(
-      String(b.observation.provider_id),
-    ),
+  accepted.sort(
+    (a, b) =>
+      a.observedMs - b.observedMs ||
+      String(a.observation.provider_id).localeCompare(
+        String(b.observation.provider_id),
+      ),
   );
   const comparisons = [];
   for (let index = 0; index < accepted.length; index += 1) {
     for (let other = index + 1; other < accepted.length; other += 1) {
       const result = comparison(accepted[index], accepted[other], {
-        maxDistanceKm, maxTimeDeltaSeconds,
+        maxDistanceKm,
+        maxTimeDeltaSeconds,
       });
       if (result) comparisons.push(result);
     }
   }
   const statuses = [
-    'CONSISTENT_REPORTS', 'CONFLICT', 'PROXIMITY_ONLY',
-    'SAME_UPSTREAM', 'STALE_COMPARISON', 'INSUFFICIENT_EVIDENCE',
+    'CONSISTENT_REPORTS',
+    'CONFLICT',
+    'PROXIMITY_ONLY',
+    'SAME_UPSTREAM',
+    'STALE_COMPARISON',
+    'INSUFFICIENT_EVIDENCE',
   ];
-  const counts = Object.fromEntries(statuses.map((s) => [
-    s, comparisons.filter((c) => c.status === s).length,
-  ]));
+  const counts = Object.fromEntries(
+    statuses.map((s) => [s, comparisons.filter((c) => c.status === s).length]),
+  );
   const providerStates = providerHealth.map(({ provider_id, state }) => ({
-    provider_id, state,
+    provider_id,
+    state,
   }));
   const failed = providerStates.filter(({ state }) =>
     ['UNKNOWN', 'PARTIAL', 'PROVIDER_FAILURE', 'RUNNING'].includes(state),
   );
-  const status = counts.CONFLICT > 0
-    ? 'CONFLICT'
-    : counts.CONSISTENT_REPORTS > 0 && failed.length === 0
-      ? 'CONSISTENT_REPORTS'
-      : 'INSUFFICIENT_EVIDENCE';
+  const status =
+    counts.CONFLICT > 0
+      ? 'CONFLICT'
+      : counts.CONSISTENT_REPORTS > 0 && failed.length === 0
+        ? 'CONSISTENT_REPORTS'
+        : 'INSUFFICIENT_EVIDENCE';
   return {
     contract_id: ARGUS_FUSION_CONTRACT_ID,
     status,
@@ -300,8 +337,9 @@ export function fuseObservations(observations, {
       excluded_count: excluded.length,
       stale_count: accepted.filter((r) => r.stale).length,
       coordinate_missing_count: accepted.filter((r) => !r.point).length,
-      delayed_receipt_count: accepted.filter((r) =>
-        r.receivedMs - r.observedMs > staleAfterSeconds * 1000).length,
+      delayed_receipt_count: accepted.filter(
+        (r) => r.receivedMs - r.observedMs > staleAfterSeconds * 1000,
+      ).length,
       comparison_count: comparisons.length,
       comparison_statuses: counts,
       incomplete_provider_count: failed.length,

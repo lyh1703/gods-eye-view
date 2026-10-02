@@ -216,23 +216,36 @@ function queryOptions(request) {
 
 function validateFusionRequest(request) {
   const area = request.area ?? request.bbox;
-  if (!Array.isArray(area) || area.length !== 4 ||
-      area.some((value) => typeof value !== 'number' || !Number.isFinite(value))) {
-    throw new TypeError('fusion requires a finite WGS84 area [west,south,east,north]');
+  if (
+    !Array.isArray(area) ||
+    area.length !== 4 ||
+    area.some((value) => typeof value !== 'number' || !Number.isFinite(value))
+  ) {
+    throw new TypeError(
+      'fusion requires a finite WGS84 area [west,south,east,north]',
+    );
   }
   const [west, south, east, north] = area;
-  if (Math.abs(west) > 180 || Math.abs(east) > 180 ||
-      Math.abs(south) > 90 || Math.abs(north) > 90 || south > north) {
+  if (
+    Math.abs(west) > 180 ||
+    Math.abs(east) > 180 ||
+    Math.abs(south) > 90 ||
+    Math.abs(north) > 90 ||
+    south > north
+  ) {
     throw new RangeError('fusion area coordinates are out of bounds');
   }
-  if (!Array.isArray(request.provider_ids) ||
-      request.provider_ids.length === 0 ||
-      request.provider_ids.length > 12 ||
-      request.provider_ids.some((id) => typeof id !== 'string' || !id.trim())) {
+  if (
+    !Array.isArray(request.provider_ids) ||
+    request.provider_ids.length === 0 ||
+    request.provider_ids.length > 12 ||
+    request.provider_ids.some((id) => typeof id !== 'string' || !id.trim())
+  ) {
     throw new TypeError('fusion requires 1-12 explicit provider_ids');
   }
   const time = request.time;
-  const zoned = (value) => typeof value === 'string' &&
+  const zoned = (value) =>
+    typeof value === 'string' &&
     /(?:Z|[+-]\\d{2}:\\d{2})$/i.test(value) &&
     Number.isFinite(Date.parse(value));
   if (!time || !zoned(time.start) || !zoned(time.end)) {
@@ -251,9 +264,13 @@ function validateFusionRequest(request) {
   }
   return {
     area,
-    regions: west <= east ? [area] : [
-      [west, south, 180, north], [-180, south, east, north],
-    ],
+    regions:
+      west <= east
+        ? [area]
+        : [
+            [west, south, 180, north],
+            [-180, south, east, north],
+          ],
     time: {
       start: new Date(time.start).toISOString(),
       end: new Date(time.end).toISOString(),
@@ -272,30 +289,43 @@ function combineFusionQueryParts(parts, requestedArea) {
       throw new TypeError('fusion requires observed-range World Memory output');
     }
     for (const observation of part.observations) {
-      const key = observation.observation_id ??
-        JSON.stringify([observation.provider_id, observation.entity_id,
-          observation.timestamp_observed, observation.geometry]);
+      const key =
+        observation.observation_id ??
+        JSON.stringify([
+          observation.provider_id,
+          observation.entity_id,
+          observation.timestamp_observed,
+          observation.geometry,
+        ]);
       if (ids.has(key)) continue;
       ids.add(key);
       observations.push(observation);
     }
   }
-  observations.sort((a, b) =>
-    Date.parse(a.timestamp_observed) - Date.parse(b.timestamp_observed),
+  observations.sort(
+    (a, b) =>
+      Date.parse(a.timestamp_observed) - Date.parse(b.timestamp_observed),
   );
   const unique = (key) => [
     ...new Set(parts.flatMap((part) => part.evidence[key])),
   ];
   const bounds = (key) => {
-    const min = parts.map((part) => part.evidence.timestamps[key]?.min)
-      .filter(Boolean).sort();
-    const max = parts.map((part) => part.evidence.timestamps[key]?.max)
-      .filter(Boolean).sort();
+    const min = parts
+      .map((part) => part.evidence.timestamps[key]?.min)
+      .filter(Boolean)
+      .sort();
+    const max = parts
+      .map((part) => part.evidence.timestamps[key]?.max)
+      .filter(Boolean)
+      .sort();
     return { min: min[0] ?? null, max: max.at(-1) ?? null };
   };
   const objectUnion = (key) => [
-    ...new Map(parts.flatMap((part) => part.evidence[key])
-      .map((row) => [JSON.stringify(row), row])).values(),
+    ...new Map(
+      parts
+        .flatMap((part) => part.evidence[key])
+        .map((row) => [JSON.stringify(row), row]),
+    ).values(),
   ];
   const conflicts = objectUnion('conflicts');
   const evidence = {
@@ -315,13 +345,16 @@ function combineFusionQueryParts(parts, requestedArea) {
       ingested: bounds('ingested'),
     },
     staleness_seconds: Math.max(
-      0, ...parts.map((part) =>
-        Number(part.evidence.staleness_seconds ?? 0)),
+      0,
+      ...parts.map((part) => Number(part.evidence.staleness_seconds ?? 0)),
     ),
   };
   return {
-    ...parts[0], area: requestedArea, observations,
-    count: observations.length, evidence,
+    ...parts[0],
+    area: requestedArea,
+    observations,
+    count: observations.length,
+    evidence,
   };
 }
 
@@ -338,20 +371,24 @@ export function createNexusVerifiedQueryAdapter({
     if (request.operation === 'fusion') {
       fusionWindow = validateFusionRequest(request);
       const parts = await Promise.all(
-        fusionWindow.regions.map((area) => argus.query({
-          area,
-          time: fusionWindow.time,
-          type: request.type ?? request.entity_type ?? null,
-          observation_type: request.observation_type ?? null,
-          provider_ids: request.provider_ids,
-          time_basis: 'observed',
-          order: 'asc',
-          limit: fusionWindow.limit,
-        })),
+        fusionWindow.regions.map((area) =>
+          argus.query({
+            area,
+            time: fusionWindow.time,
+            type: request.type ?? request.entity_type ?? null,
+            observation_type: request.observation_type ?? null,
+            provider_ids: request.provider_ids,
+            time_basis: 'observed',
+            order: 'asc',
+            limit: fusionWindow.limit,
+          }),
+        ),
       );
       data = combineFusionQueryParts(parts, fusionWindow.area);
       if (data.mode !== 'history' || !Array.isArray(data.observations)) {
-        throw new TypeError('fusion requires observed-range World Memory output');
+        throw new TypeError(
+          'fusion requires observed-range World Memory output',
+        );
       }
     } else if (request.operation === 'current') {
       data = await argus.get(
@@ -414,7 +451,8 @@ export function createNexusVerifiedQueryAdapter({
 
     let fusion = null;
     if (fusionWindow) {
-      const incomplete = data.observations.length >=
+      const incomplete =
+        data.observations.length >=
         fusionWindow.limit * fusionWindow.regions.length;
       fusion = fuseObservations(data.observations, {
         now: now(),
@@ -430,7 +468,8 @@ export function createNexusVerifiedQueryAdapter({
       };
       fusion.possibly_truncated = incomplete;
       if (incomplete || requestedDegraded) {
-        if (fusion.status !== 'CONFLICT') fusion.status = 'INSUFFICIENT_EVIDENCE';
+        if (fusion.status !== 'CONFLICT')
+          fusion.status = 'INSUFFICIENT_EVIDENCE';
       }
     }
 
