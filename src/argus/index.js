@@ -79,3 +79,16 @@ export {
   GEV_CELESTRAK_SATELLITES_PROVIDER,
   createGevCelestrakSatellitesAdapter,
 } from './providers/gevCelestrakSatellites.js';
+
+export {
+  GEV_CCTV_CATALOG_PROVIDER,
+  createGevCctvCatalogAdapter,
+} from './providers/gevCctvCatalog.js';
+export {
+  GEV_PUBLIC_TRANSIT_PROVIDER,
+  createGevTransitAdapter,
+} from './providers/gevTransit.js';
+export {
+  GEV_RADIO_DIRECTORY_PROVIDER,
+  createGevRadioDirectoryAdapter,
+} from './providers/gevRadioDirectory.js';

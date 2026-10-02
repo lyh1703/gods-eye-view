@@ -90,9 +90,12 @@ test('recovered high-value providers are mapped without overclaiming operational
     'ais-vessels',
     'regional-weather',
     'traffic-flow',
+    'transit',
+    'cctv',
     'fire-firms',
     'earthquakes',
     'space-satellites',
+    'radio',
   ]);
   for (const capabilityId of [
     'aviation-flights',
@@ -104,7 +107,12 @@ test('recovered high-value providers are mapped without overclaiming operational
     assert.equal(status?.validated, true);
     assert.equal(status?.operational, false);
   }
-  for (const capabilityId of ['ais-vessels', 'fire-firms']) {
+  for (const capabilityId of [
+    'ais-vessels',
+    'fire-firms',
+    'cctv',
+    'radio',
+  ]) {
     const status = getUpstreamGevCapability(capabilityId)?.status;
     assert.equal(status?.mapped_to_argus, true);
     assert.equal(status?.implemented, true);
@@ -119,6 +127,12 @@ test('recovered high-value providers are mapped without overclaiming operational
   assert.equal(spaceStatus?.validated, true);
   assert.equal(spaceStatus?.operational, false);
 
+  const transit = getUpstreamGevCapability('transit')?.status;
+  assert.equal(transit?.mapped_to_argus, true);
+  assert.equal(transit?.implemented, true);
+  assert.equal(transit?.query_callable, true);
+  assert.equal(transit?.validated, true);
+  assert.equal(transit?.operational, false);
   assert.equal(getUpstreamGevCapability('earthquakes')?.status.operational, true);
 });
 
@@ -131,6 +145,6 @@ test('capability inventory supports domain and lifecycle filters', () => {
   );
   assert.equal(
     listUpstreamGevCapabilities({ query_callable: false }).length,
-    UPSTREAM_GEV_CAPABILITY_INVENTORY.length - 7,
+    UPSTREAM_GEV_CAPABILITY_INVENTORY.length - 10,
   );
 });
