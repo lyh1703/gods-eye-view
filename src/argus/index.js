@@ -92,3 +92,8 @@ export {
   GEV_RADIO_DIRECTORY_PROVIDER,
   createGevRadioDirectoryAdapter,
 } from './providers/gevRadioDirectory.js';
+
+export {
+  ARGUS_FUSION_CONTRACT_ID,
+  fuseObservations,
+} from './multiSourceFusion.js';
