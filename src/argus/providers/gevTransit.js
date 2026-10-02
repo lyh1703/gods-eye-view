@@ -97,8 +97,7 @@ export function createGevTransitAdapter({
           if (filters.entity_id && filters.entity_id !== entityId) continue;
           if (!inArea(lon, lat, scope)) continue;
           const vehicleTimestamp = normalizeEpochSeconds(item.timestamp);
-          const observedAt =
-            vehicleTimestamp || feedTimestamp || receiptStamp;
+          const observedAt = vehicleTimestamp || feedTimestamp || receiptStamp;
           let timestampSource = 'receipt';
           if (feedTimestamp) timestampSource = 'feed';
           if (vehicleTimestamp)
