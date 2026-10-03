@@ -1,5 +1,3 @@
-import { createHash } from 'node:crypto';
-
 const UPSTREAM = 'https://github.com/TextureHQ/commongrid';
 const SHA40 = /^[0-9a-f]{40}$/;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -10,7 +8,10 @@ function parseDay(value, field) {
     throw new Error(`${field} requires YYYY-MM-DD`);
   }
   const date = new Date(`${value}T00:00:00.000Z`);
-  if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
+  if (
+    !Number.isFinite(date.getTime()) ||
+    date.toISOString().slice(0, 10) !== value
+  ) {
     throw new Error(`${field} is not a calendar date`);
   }
   return date;
@@ -21,7 +22,7 @@ function parseDay(value, field) {
  * evidence envelope. This method is pure, read-only and never accesses a URL.
  * It deliberately does not synthesize coordinates, power flow or live readings.
  */
-export function inspectCommonGridUtilities(
+export async function inspectCommonGridUtilities(
   rawJson,
   {
     upstreamCommit,
@@ -31,7 +32,11 @@ export function inspectCommonGridUtilities(
     maxAgeDays = 90,
   } = {},
 ) {
-  if (typeof rawJson !== 'string' || Buffer.byteLength(rawJson, 'utf8') > MAX_INPUT_BYTES) {
+  if (typeof rawJson !== 'string') {
+    throw new Error('source must be bounded UTF-8 JSON string');
+  }
+  const bytes = new TextEncoder().encode(rawJson);
+  if (bytes.byteLength > MAX_INPUT_BYTES) {
     throw new Error('source must be bounded UTF-8 JSON string');
   }
   if (!SHA40.test(upstreamCommit ?? '')) {
@@ -40,10 +45,20 @@ export function inspectCommonGridUtilities(
   const published = parseDay(sourcePublishedDate, 'sourcePublishedDate');
   const asOf = parseDay(asOfDate, 'asOfDate');
   const age = (asOf - published) / 86_400_000;
-  if (age < 0 || !Number.isInteger(maxAgeDays) || maxAgeDays < 1 || age > maxAgeDays) {
+  if (
+    age < 0 ||
+    !Number.isInteger(maxAgeDays) ||
+    maxAgeDays < 1 ||
+    age > maxAgeDays
+  ) {
     throw new Error('snapshot is future-dated or stale');
   }
-  const sourceSha256 = createHash('sha256').update(rawJson, 'utf8').digest('hex');
+  const hashedBytes = new Uint8Array(
+    await globalThis.crypto.subtle.digest('SHA-256', bytes),
+  );
+  const sourceSha256 = Array.from(hashedBytes)
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
   if (expectedSha256 != null && sourceSha256 !== expectedSha256) {
     throw new Error('source SHA-256 mismatch');
   }
@@ -61,15 +76,25 @@ export function inspectCommonGridUtilities(
     if (!record || typeof record !== 'object' || Array.isArray(record)) {
       throw new Error('invalid utility entry');
     }
-    if (typeof record.id !== 'string' || !/^[a-zA-Z0-9-]{8,64}$/.test(record.id)) {
+    if (
+      typeof record.id !== 'string' ||
+      !/^[a-zA-Z0-9-]{8,64}$/.test(record.id)
+    ) {
       throw new Error('utility id is missing or unsafe');
     }
     if (seen.has(record.id)) throw new Error('duplicate utility id');
     seen.add(record.id);
-    if (typeof record.name !== 'string' || !record.name.trim() || record.name.length > 240) {
+    if (
+      typeof record.name !== 'string' ||
+      !record.name.trim() ||
+      record.name.length > 240
+    ) {
       throw new Error('utility name missing or too long');
     }
-    if (typeof record.segment !== 'string' || !/^[A-Z_]{2,64}$/.test(record.segment)) {
+    if (
+      typeof record.segment !== 'string' ||
+      !/^[A-Z_]{2,64}$/.test(record.segment)
+    ) {
       throw new Error('utility segment missing or invalid');
     }
     if (record.jurisdiction != null && typeof record.jurisdiction !== 'string') {
@@ -82,7 +107,7 @@ export function inspectCommonGridUtilities(
     if (regions.some((region) => !/^[A-Z]{2}$/.test(region))) {
       throw new Error('non-US jurisdiction code');
     }
-    // Explicit allowlist: NO geometry, capacity, live MW, phone, or agent action.
+    // Strict allowlist: no location points or inferred live output.
     return Object.freeze({
       id: record.id,
       name: record.name.trim(),
