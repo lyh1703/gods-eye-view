@@ -2,9 +2,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { createExternalProviderIngestor } from './externalProviderIngest.js';
+import { createObservationEnvelope } from './observationEnvelope.js';
 import { createPostgresWorldMemoryRepository } from './memory/postgresRepository.js';
 import { createWorldMemoryQueryEngine } from './memory/worldMemoryQuery.js';
-import { createUsgsEarthquakesAdapter } from './providers/usgsEarthquakes.js';
+import {
+  createUsgsEarthquakesAdapter,
+  USGS_EARTHQUAKES_PROVIDER,
+} from './providers/usgsEarthquakes.js';
 
 const url = process.env.ARGUS_POSTGRES_TEST_URL;
 
@@ -96,4 +100,67 @@ if (!url) {
       await pool.end();
     }
   });
+  test('G4 PostGIS: duplicate upstream rows and replay do not inflate evidence', async () => {
+    const pool = new Pool({ connectionString: url });
+    try {
+      const repository = createPostgresWorldMemoryRepository({ db: pool });
+      const clock = new Date();
+      const raw = createObservationEnvelope({
+        provider_id: USGS_EARTHQUAKES_PROVIDER.provider_id,
+        entity_type: 'earthquake',
+        entity_id: 'g4-postgis-same-batch',
+        observation_type: 'earthquake-event',
+        timestamp_observed: new Date(clock.getTime() - 10_000),
+        timestamp_received: clock,
+        geometry: { type: 'Point', coordinates: [126.8, 37.4] },
+        properties: { magnitude: 2.2, test_case: 'G4 local fixture' },
+        source_url: 'https://earthquake.usgs.gov/earthquakes/eventpage/g4-postgis-same-batch',
+        license_class: 'us-government-public-domain',
+        retention_policy: 'test-only',
+        rate_limit_class: 'public-feed',
+        ingestion_run_id: 'provider-source-placeholder',
+      });
+      const provider = {
+        metadata: USGS_EARTHQUAKES_PROVIDER,
+        async query() { return [raw, structuredClone(raw)]; },
+      };
+      const ingestor = createExternalProviderIngestor({
+        repository, now: () => clock, maxAttempts: 1,
+      });
+      const first = await ingestor.ingest(provider);
+      assert.equal(first.inserted, 1);
+      assert.equal(first.duplicates, 1);
+      const retry = await ingestor.ingest(provider);
+      assert.equal(retry.inserted, 0);
+      assert.equal(retry.duplicates, 2);
+      const history = await repository.getEntityHistory({
+        provider_ids: [USGS_EARTHQUAKES_PROVIDER.provider_id],
+        entity_type: 'earthquake',
+        provider_entity_id: 'g4-postgis-same-batch',
+        limit: 10,
+      });
+      assert.equal(history.length, 1);
+      assert.equal(history[0].content_hash.length, 64);
+
+      const spoof = await ingestor.ingest({
+        metadata: USGS_EARTHQUAKES_PROVIDER,
+        async query() { return [{ ...raw, provider_id: 'false-evidence' }]; },
+      });
+      assert.equal(spoof.status, 'DEGRADED');
+      assert.equal(spoof.error.code, 'INVALID_OBSERVATION_EVIDENCE');
+      assert.equal(
+        (await repository.getIngestionRun(spoof.ingestion_run_id)).status,
+        'FAILED',
+      );
+      assert.equal((await repository.getEntityHistory({
+        provider_ids: [USGS_EARTHQUAKES_PROVIDER.provider_id],
+        entity_type: 'earthquake',
+        provider_entity_id: 'g4-postgis-same-batch',
+        limit: 10,
+      })).length, 1);
+    } finally {
+      await pool.end();
+    }
+  });
+
 }
