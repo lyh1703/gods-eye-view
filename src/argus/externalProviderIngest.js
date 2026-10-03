@@ -1,3 +1,4 @@
+import { validateObservationEnvelope } from './observationEnvelope.js';
 import { validateWorldMemoryRepository } from './memory/repository.js';
 
 function stableValue(value) {
@@ -166,22 +167,81 @@ export function createExternalProviderIngestor({
       };
     }
 
+    // Fail the complete snapshot closed before reading history or appending
+    // anything: the claimed provider must match the adapter, and every
+    // observation must satisfy the shared envelope contract.
+    let evidenceError = null;
+    for (const observation of observations) {
+      const checked = validateObservationEnvelope(observation);
+      if (!checked.ok) {
+        evidenceError = new TypeError(
+          `Invalid provider observation: ${checked.errors.join('; ')}`,
+        );
+      } else if (observation.provider_id !== providerId) {
+        evidenceError = new TypeError(
+          'Observation provider_id differs from the queried adapter',
+        );
+      }
+      if (evidenceError) break;
+    }
+    if (evidenceError) {
+      evidenceError.code = 'INVALID_OBSERVATION_EVIDENCE';
+      await memory.saveIngestionRun({
+        ...baseRun,
+        status: 'FAILED',
+        completed_at: now().toISOString(),
+        records_seen: observations.length,
+        records_accepted: 0,
+        records_rejected: observations.length,
+        metadata: {
+          ...baseRun.metadata,
+          degraded: true,
+          phase: 'evidence-validation',
+          attempts: attemptsUsed,
+          retry_count: Math.max(0, attemptsUsed - 1),
+          error: errorSummary(evidenceError),
+        },
+      });
+      return {
+        status: 'DEGRADED',
+        provider_id: providerId,
+        ingestion_run_id: runId,
+        inserted: 0,
+        duplicates: 0,
+        revisions: 0,
+        attempts: attemptsUsed,
+        error: errorSummary(evidenceError),
+      };
+    }
+
     const accepted = [];
+    const historyByEntity = new Map();
     let duplicates = 0;
     let revisions = 0;
     let outOfOrder = 0;
 
     for (const observation of observations) {
       const hash = await contentHash(observation);
-      const history = await memory.getEntityHistory({
-        provider_ids: [providerId],
-        entity_type: observation.entity_type,
-        provider_entity_id: observation.entity_id,
-        observation_type: observation.observation_type,
-        order: 'desc',
-        limit: 100,
-        time_basis: 'ingested',
-      });
+      const entityKey = JSON.stringify([
+        observation.entity_type,
+        observation.entity_id,
+        observation.observation_type,
+      ]);
+      if (!historyByEntity.has(entityKey)) {
+        // Reverse the repository's newest-first order: an in-flight revision
+        // appended below must be the final tie-breaker for equal observed_at.
+        const committed = await memory.getEntityHistory({
+          provider_ids: [providerId],
+          entity_type: observation.entity_type,
+          provider_entity_id: observation.entity_id,
+          observation_type: observation.observation_type,
+          order: 'desc',
+          limit: 100,
+          time_basis: 'ingested',
+        });
+        historyByEntity.set(entityKey, [...committed].reverse());
+      }
+      const history = historyByEntity.get(entityKey);
 
       if (history.some((item) => item.content_hash === hash)) {
         duplicates += 1;
@@ -193,7 +253,10 @@ export function createExternalProviderIngestor({
         const latestObserved = Date.parse(latest.timestamp_observed ?? '');
         const itemObserved = Date.parse(item.timestamp_observed ?? '');
         if (!Number.isFinite(itemObserved)) return latest;
-        if (!Number.isFinite(latestObserved) || itemObserved > latestObserved) {
+        if (
+          !Number.isFinite(latestObserved) ||
+          itemObserved >= latestObserved
+        ) {
           return item;
         }
         return latest;
@@ -206,7 +269,7 @@ export function createExternalProviderIngestor({
         Number.isFinite(previousObserved) &&
         incomingObserved < previousObserved;
 
-      accepted.push({
+      const staged = {
         ...observation,
         observation_id: uuid(),
         ingestion_run_id: runId,
@@ -215,7 +278,12 @@ export function createExternalProviderIngestor({
         supersedes_observation_id: isOutOfOrder
           ? null
           : (previous?.observation_id ?? null),
-      });
+      };
+      accepted.push(staged);
+      // The original history query sees only previously committed rows.
+      // Include this snapshot's accepted rows so relays/repeated items within
+      // a single provider response are not counted as new observations.
+      history.push(staged);
       if (isOutOfOrder) outOfOrder += 1;
       else if (previous) revisions += 1;
     }
