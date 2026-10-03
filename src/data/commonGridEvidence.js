@@ -97,7 +97,10 @@ export async function inspectCommonGridUtilities(
     ) {
       throw new Error('utility segment missing or invalid');
     }
-    if (record.jurisdiction != null && typeof record.jurisdiction !== 'string') {
+    if (
+      record.jurisdiction != null &&
+      typeof record.jurisdiction !== 'string'
+    ) {
       throw new Error('jurisdiction type invalid');
     }
     const regions = (record.jurisdiction || '')
