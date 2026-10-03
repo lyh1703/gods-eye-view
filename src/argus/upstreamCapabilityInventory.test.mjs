@@ -133,7 +133,10 @@ test('recovered high-value providers are mapped without overclaiming operational
   assert.equal(transit?.query_callable, true);
   assert.equal(transit?.validated, true);
   assert.equal(transit?.operational, false);
-  assert.equal(getUpstreamGevCapability('earthquakes')?.status.operational, true);
+  // A live feed E2E proves data validation, not a deployed monitored service.
+  const quake = getUpstreamGevCapability('earthquakes')?.status;
+  assert.equal(quake?.validated, true);
+  assert.equal(quake?.operational, false);
 });
 
 test('capability inventory supports domain and lifecycle filters', () => {

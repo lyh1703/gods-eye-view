@@ -211,7 +211,6 @@ export const UPSTREAM_GEV_CAPABILITY_INVENTORY = Object.freeze([
     mapped_to_argus: true,
     query_callable: true,
     validated: true,
-    operational: true,
   }),
   capability({
     capability_id: 'space-satellites',
