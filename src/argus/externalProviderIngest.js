@@ -253,7 +253,10 @@ export function createExternalProviderIngestor({
         const latestObserved = Date.parse(latest.timestamp_observed ?? '');
         const itemObserved = Date.parse(item.timestamp_observed ?? '');
         if (!Number.isFinite(itemObserved)) return latest;
-        if (!Number.isFinite(latestObserved) || itemObserved >= latestObserved) {
+        if (
+          !Number.isFinite(latestObserved) ||
+          itemObserved >= latestObserved
+        ) {
           return item;
         }
         return latest;
