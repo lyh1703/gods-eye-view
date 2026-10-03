@@ -120,13 +120,6 @@ export async function formatAdoptedFiles(root, mode) {
   }
 
   const changed = files.filter(({ source, formatted }) => source !== formatted);
-  for (const item of changed) {
-    if (item.name === 'src/data/commonGridEvidence.js') {
-      console.error('@@EXPECTED_FORMAT_BEGIN@@');
-      console.error(item.formatted);
-      console.error('@@EXPECTED_FORMAT_END@@');
-    }
-  }
   if (mode === '--write') {
     for (const { file, formatted } of changed) await writeFile(file, formatted);
   }
