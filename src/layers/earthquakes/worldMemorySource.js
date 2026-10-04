@@ -11,7 +11,12 @@ function observedTime(value) {
   return Number.isFinite(time) ? time : null;
 }
 
-function storedEarthquake(observation, analysisMs, staleAfterSeconds, degraded) {
+function storedEarthquake(
+  observation,
+  analysisMs,
+  staleAfterSeconds,
+  degraded,
+) {
   if (
     observation?.provider_id !== PROVIDER_ID ||
     observation.entity_type !== 'earthquake' ||
@@ -20,7 +25,9 @@ function storedEarthquake(observation, analysisMs, staleAfterSeconds, degraded) 
     !observation.ingestion_run_id ||
     !/^[0-9a-f]{64}$/i.test(String(observation.content_hash ?? ''))
   ) {
-    throw new TypeError('World Memory earthquake lacks verified storage lineage');
+    throw new TypeError(
+      'World Memory earthquake lacks verified storage lineage',
+    );
   }
 
   let origin;
@@ -29,7 +36,10 @@ function storedEarthquake(observation, analysisMs, staleAfterSeconds, degraded) 
   } catch {
     throw new TypeError('World Memory earthquake has invalid source URL');
   }
-  if (origin.protocol !== 'https:' || origin.hostname !== 'earthquake.usgs.gov') {
+  if (
+    origin.protocol !== 'https:' ||
+    origin.hostname !== 'earthquake.usgs.gov'
+  ) {
     throw new TypeError('World Memory earthquake lacks official USGS source');
   }
 
@@ -44,7 +54,9 @@ function storedEarthquake(observation, analysisMs, staleAfterSeconds, degraded) 
     receivedMs > ingestedMs + 120_000 ||
     ingestedMs > analysisMs + 120_000
   ) {
-    throw new TypeError('World Memory earthquake observation/receipt/ingest chronology invalid');
+    throw new TypeError(
+      'World Memory earthquake observation/receipt/ingest chronology invalid',
+    );
   }
 
   const geometry = observation.geometry;
@@ -59,7 +71,9 @@ function storedEarthquake(observation, analysisMs, staleAfterSeconds, degraded) 
     Math.abs(coords[1]) > 90 ||
     (coords[2] != null && !Number.isFinite(coords[2]))
   ) {
-    throw new TypeError('World Memory earthquake coordinates must be WGS84 Point');
+    throw new TypeError(
+      'World Memory earthquake coordinates must be WGS84 Point',
+    );
   }
   const mag = observation.properties?.magnitude;
   if (typeof mag !== 'number' || !Number.isFinite(mag) || mag > 10) {
@@ -91,7 +105,8 @@ function storedEarthquake(observation, analysisMs, staleAfterSeconds, degraded) 
       stale,
       degraded,
       age_seconds: ageSeconds,
-      evidence_note: 'Official USGS source record, not independent event verification',
+      evidence_note:
+        'Official USGS source record, not independent event verification',
     },
   };
 }
@@ -155,9 +170,10 @@ export function createWorldMemoryEarthquakeSource({
 
       let providerState = 'UNKNOWN';
       try {
-        const run = await world.repository?.getLatestIngestionRunForProvider?.(
-          PROVIDER_ID,
-        );
+        const run =
+          await world.repository?.getLatestIngestionRunForProvider?.(
+            PROVIDER_ID,
+          );
         providerState = String(run?.status ?? 'UNKNOWN');
       } catch {
         providerState = 'UNKNOWN';

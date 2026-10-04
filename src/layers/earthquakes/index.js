@@ -242,8 +242,7 @@ export function createEarthquakesLayer({ source, overlayHost } = {}) {
       const state = source.getEvidenceStatus?.();
       if (!state) {
         return {
-          info:
-            'USGS OBSERVATION · direct public feed; not a World Memory readback or independently verified event',
+          info: 'USGS OBSERVATION · direct public feed; not a World Memory readback or independently verified event',
         };
       }
       return {
@@ -264,9 +263,7 @@ export function createEarthquakesLayer({ source, overlayHost } = {}) {
         source: state
           ? 'ARGUS World Memory · STORED OBSERVATION'
           : 'USGS · DIRECT OBSERVATION',
-        status: _lastError
-          ? 'degraded'
-          : (state?.status ?? 'nominal'),
+        status: _lastError ? 'degraded' : (state?.status ?? 'nominal'),
         stale: state?.status === 'stale',
         degraded: Boolean(_lastError) || state?.status === 'degraded',
       };
