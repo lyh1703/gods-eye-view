@@ -364,13 +364,16 @@ test('malformed earthquake refresh preserves entities, overlays, count and times
       const bad = { ...good, id: 'bad-properties', properties };
       for (const features of [[bad], [good, bad]]) {
         respond(features);
+        const beforeFailure = publications.length;
         assert.equal(await layer.update(viewer), false);
         assert.equal(dataSources[0].entities.values.length, 1);
         assert.equal(dataSources[0].entities.values[0], entity);
         assert.equal(layer.getStats().count, stats.count);
         assert.equal(layer.getStats().lastUpdate, stats.lastUpdate);
         assert.equal(layer.getStats().error, 'Malformed USGS response');
-        assert.equal(publications.length, 1);
+        assert.equal(publications.length, beforeFailure + 1);
+        assert.match(publications.at(-1)[1][0].title, /STALE REF/);
+        assert.equal(entity.properties.presentationClass.getValue(), 'STALE_REFERENCE');
       }
     }
     for (const bad of [null, { ...good, geometry: null },
@@ -381,13 +384,15 @@ test('malformed earthquake refresh preserves entities, overlays, count and times
       { ...good, properties: { mag: '4' } },
       { ...good, properties: { mag: Infinity } }, good]) {
       respond([good, bad]);
+      const beforeFailure = publications.length;
       assert.equal(await layer.update(viewer), false);
       assert.equal(dataSources[0].entities.values.length, 1);
       assert.equal(dataSources[0].entities.values[0], entity);
       assert.equal(layer.getStats().count, stats.count);
       assert.equal(layer.getStats().lastUpdate, stats.lastUpdate);
       assert.equal(layer.getStats().error, 'Malformed USGS response');
-      assert.equal(publications.length, 1);
+      assert.equal(publications.length, beforeFailure + 1);
+      assert.match(publications.at(-1)[1][0].title, /STALE REF/);
     }
     respond([{ ...good, properties: { mag: null } }]);
     assert.equal(await layer.update(viewer), true);
