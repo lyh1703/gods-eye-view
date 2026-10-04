@@ -12,6 +12,19 @@ export * from './model.js';
 export { createUsgsEarthquakeSource } from './source.js';
 export { createWorldMemoryEarthquakeSource } from './worldMemorySource.js';
 
+// Presentation is distinct from the provenance: cached observations are not
+// fresh measurements merely because their original provider was official.
+function presentationClass(evidence, refreshFailed = false) {
+  if (refreshFailed || evidence?.stale) return 'STALE_REFERENCE';
+  return evidence ? 'PERSISTED_OBSERVATION' : 'DIRECT_OBSERVATION';
+}
+
+function presentationLabel(classification) {
+  if (classification === 'STALE_REFERENCE') return 'STALE REF';
+  if (classification === 'PERSISTED_OBSERVATION') return 'PERSISTED OBS';
+  return 'DIRECT OBS';
+}
+
 /** Own one earthquake display and its refresh lifecycle. */
 export function createEarthquakesLayer({ source, overlayHost } = {}) {
   if (typeof source?.getSnapshot !== 'function')
@@ -23,6 +36,7 @@ export function createEarthquakesLayer({ source, overlayHost } = {}) {
   let _count = 0;
   let _lastUpdate = null;
   let _lastError = null;
+  let _lastOverlayEntries = [];
   let _enabled = false;
 
   const layer = {
@@ -44,6 +58,7 @@ export function createEarthquakesLayer({ source, overlayHost } = {}) {
       _count = 0;
       _lastUpdate = null;
       _lastError = null;
+      _lastOverlayEntries = [];
       _enabled = false;
       overlayHost.setVisible(EARTHQUAKE_OVERLAY_SOURCE_ID, false);
       console.log('[Data:Earthquakes] Initialized');
@@ -92,6 +107,7 @@ export function createEarthquakesLayer({ source, overlayHost } = {}) {
           evidence = null,
         } of rows) {
           count++;
+          const presentation = presentationClass(evidence);
           const baseRadius = Math.pow(2, mag) * 1000;
           const color = depthColor(depthKm || 0);
           const isSignificant = mag >= 5.0;
@@ -125,6 +141,8 @@ export function createEarthquakesLayer({ source, overlayHost } = {}) {
                 depth: depthKm,
                 evidenceKind: 'OBSERVATION',
                 evidenceMode: evidence?.source_mode ?? 'DIRECT_USGS_FEED',
+                presentationClass: presentation,
+                refreshFailedReference: false,
                 sourceUrl: evidence?.source_url ?? null,
                 timestampObserved: evidence?.timestamp_observed ?? null,
                 timestampReceived: evidence?.timestamp_received ?? null,
@@ -141,20 +159,17 @@ export function createEarthquakesLayer({ source, overlayHost } = {}) {
               magnitude: mag,
               accent: color.toCssColorString(),
             }),
-            // Preserve the legacy direct-feed label. Only the opt-in
-            // persisted World Memory path adds an explicit evidence marker.
-            title: evidence
-              ? `M${mag.toFixed(1)} · ${evidence.stale ? 'STALE OBS' : 'STORED OBS'}`
-              : `M${mag.toFixed(1)}`,
+            title: `M${mag.toFixed(1)} · ${presentationLabel(presentation)}`,
           });
         }
 
         _dataSource.entities.removeAll();
         for (const entity of nextEntities) _dataSource.entities.add(entity);
         if (_enabled) {
+          _lastOverlayEntries = selectEarthquakeOverlayCohort(overlayEntries);
           overlayHost.setEntries(
             EARTHQUAKE_OVERLAY_SOURCE_ID,
-            selectEarthquakeOverlayCohort(overlayEntries),
+            _lastOverlayEntries,
             {
               cohortLimit: EARTHQUAKE_OVERLAY_COHORT_LIMIT,
               collisionCapacity: EARTHQUAKE_OVERLAY_COLLISION_CAPACITY,
@@ -175,6 +190,31 @@ export function createEarthquakesLayer({ source, overlayHost } = {}) {
           return false;
         console.warn('[Data:Earthquakes] Fetch error:', e);
         _lastError = e?.message || 'Earthquake source unavailable';
+        // Never leave previously displayed entities labeled as current
+        // observations after their source failed to refresh. Keep the last
+        // known position and provenance for reference, not a fabricated fact.
+        if (_count > 0) {
+          for (const entity of _dataSource.entities.values) {
+            entity.properties.presentationClass = 'STALE_REFERENCE';
+            entity.properties.refreshFailedReference = true;
+          }
+          _lastOverlayEntries = _lastOverlayEntries.map((entry) => ({
+            ...entry,
+            title: entry.title.replace(
+              / · (?:DIRECT OBS|PERSISTED OBS|STALE REF)$/,
+              ' · STALE REF',
+            ),
+          }));
+          overlayHost.setEntries(
+            EARTHQUAKE_OVERLAY_SOURCE_ID,
+            _lastOverlayEntries,
+            {
+              cohortLimit: EARTHQUAKE_OVERLAY_COHORT_LIMIT,
+              collisionCapacity: EARTHQUAKE_OVERLAY_COLLISION_CAPACITY,
+              moving: false,
+            },
+          );
+        }
         return false;
       } finally {
         if (_request === request) _request = null;
@@ -195,6 +235,7 @@ export function createEarthquakesLayer({ source, overlayHost } = {}) {
       _count = 0;
       _lastUpdate = null;
       _lastError = null;
+      _lastOverlayEntries = [];
     },
 
     /**
@@ -236,24 +277,31 @@ export function createEarthquakesLayer({ source, overlayHost } = {}) {
           result.length,
         );
         const evidence = p?.evidence?.getValue(now);
-        result.push(evidence ? { ...analystRecord, evidence } : analystRecord);
+        result.push({
+          ...analystRecord,
+          presentation_class: p?.presentationClass?.getValue(now) ?? null,
+          refresh_failed_reference:
+            p?.refreshFailedReference?.getValue(now) ?? false,
+          ...(evidence ? { evidence } : {}),
+        });
       }
       return result;
     },
 
     getRowControls() {
       const state = source.getEvidenceStatus?.();
+      if (_lastError && _count > 0) {
+        return {
+          info: `STALE REFERENCE · previous observation retained; latest refresh failed: ${_lastError} · not independently verified`,
+        };
+      }
       if (!state) {
         return {
-          info: 'USGS OBSERVATION · direct public feed; not a World Memory readback or independently verified event',
+          info: 'DIRECT OBSERVATION · USGS public feed; not a World Memory readback or independently verified event',
         };
       }
       return {
-        info: `STORED OBSERVATION · ARGUS World Memory · ${
-          state.stale_count
-        } stale · upstream run: ${state.provider_state} · analysis: ${
-          state.analyzed_at ?? 'not yet read'
-        } · no independent event verification`,
+        info: `PERSISTED OBSERVATION · ARGUS World Memory · ${state.stale_count} stale reference(s) · upstream run: ${state.provider_state} · analysis: ${state.analyzed_at ?? 'not yet read'} · not independently verified`,
       };
     },
 
@@ -263,11 +311,14 @@ export function createEarthquakesLayer({ source, overlayHost } = {}) {
         count: _count,
         lastUpdate: _lastUpdate,
         error: _lastError,
-        source: state
-          ? 'ARGUS World Memory · STORED OBSERVATION'
-          : 'USGS · DIRECT OBSERVATION',
+        source:
+          _lastError && _count
+            ? 'CACHED · STALE REFERENCE'
+            : state
+              ? 'ARGUS World Memory · PERSISTED OBSERVATION'
+              : 'USGS · DIRECT OBSERVATION',
         status: _lastError ? 'degraded' : (state?.status ?? 'nominal'),
-        stale: state?.status === 'stale',
+        stale: Boolean(_lastError && _count) || (state?.stale_count ?? 0) > 0,
         degraded: Boolean(_lastError) || state?.status === 'degraded',
       };
     },
