@@ -139,7 +139,7 @@ test('real earthquake lifecycle publishes host labels while runtime entities car
     assert.ok(entities.every((entity) => entity.label === undefined));
     const publication = hostCalls.find(([type]) => type === 'entries');
     assert.ok(publication, 'real update path must publish the overlay source');
-    assert.deepEqual(publication[2].map(({ title }) => title), ['M5.2', 'M3.0']);
+    assert.deepEqual(publication[2].map(({ title }) => title), ['M5.2 · DIRECT OBS', 'M3.0 · DIRECT OBS']);
     assert.deepEqual(publication[3], {
       cohortLimit: EARTHQUAKE_OVERLAY_COHORT_LIMIT,
       collisionCapacity: EARTHQUAKE_OVERLAY_COLLISION_CAPACITY,
