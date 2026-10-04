@@ -141,13 +141,11 @@ export function createEarthquakesLayer({ source, overlayHost } = {}) {
               magnitude: mag,
               accent: color.toCssColorString(),
             }),
-            title: `M${mag.toFixed(1)} · ${
-              evidence?.stale
-                ? 'STALE OBS'
-                : evidence?.source_mode === 'STORED_WORLD_MEMORY'
-                  ? 'STORED OBS'
-                  : 'USGS OBS'
-            }`,
+            // Preserve the legacy direct-feed label. Only the opt-in
+            // persisted World Memory path adds an explicit evidence marker.
+            title: evidence
+              ? `M${mag.toFixed(1)} · ${evidence.stale ? 'STALE OBS' : 'STORED OBS'}`
+              : `M${mag.toFixed(1)}`,
           });
         }
 

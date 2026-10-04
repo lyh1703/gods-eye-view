@@ -133,6 +133,8 @@ test('latest fetch outage retains stored evidence as DEGRADED, old observations 
     fetchImpl: async () => ({ ok: true, json: async () => feed() }),
   });
   assert.equal((await ingestor.ingest(good)).inserted, 1);
+  // Distinct completion timestamps are required for latest-run ordering.
+  clock.value = new Date('2026-10-04T00:00:13.000Z');
   const bad = createUsgsEarthquakesAdapter({
     now: () => clock.value,
     fetchImpl: async () => ({ ok: false, status: 503 }),
@@ -170,6 +172,7 @@ test('timeouts do not erase last persisted real-format observations', async () =
     fetchImpl: async () => ({ ok: true, json: async () => feed() }),
   });
   await ingestor.ingest(good);
+  clock.value = new Date('2026-10-04T00:00:13.000Z');
   const timeout = createUsgsEarthquakesAdapter({
     now: () => clock.value,
     timeoutMs: 10,
