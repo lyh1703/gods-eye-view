@@ -10,6 +10,8 @@ on:
       - 'src/argus/externalProviderIngest*'
       - 'src/argus/nexusVerifiedQuery*'
       - 'src/argus/multiSourceFusion*'
+      - 'src/layers/earthquakes/worldMemorySource*'
+      - 'src/layers/earthquakes/index.js'
       - '.github/workflows/argus-postgis.yml'
   workflow_dispatch:
 
@@ -124,6 +126,11 @@ jobs:
         env:
           ARGUS_POSTGRES_TEST_URL: postgresql://argus:argus@127.0.0.1:5432/argus_test
         run: node --test src/argus/externalProviderIngest.postgres.test.mjs
+
+      - name: Run USGS PostGIS restart readback into actual Cesium map entities
+        env:
+          ARGUS_POSTGRES_TEST_URL: postgresql://argus:argus@127.0.0.1:5432/argus_test
+        run: node --test src/layers/earthquakes/worldMemorySource.postgres.test.mjs
 
       - name: Run public CelesTrak to PostGIS NEXUS E2E gate
         env:
