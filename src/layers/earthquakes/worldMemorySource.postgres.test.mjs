@@ -64,6 +64,7 @@ if (!databaseUrl) {
       });
       const rows = await source.getSnapshot();
       assert.ok(Array.isArray(rows));
+      assert.ok(rows.length > 0, 'Actual stored USGS rows must reach UI source');
       assert.equal(source.getEvidenceStatus().kind, 'OBSERVATION');
       assert.equal(source.getEvidenceStatus().source_mode, 'STORED_WORLD_MEMORY');
 
@@ -97,7 +98,11 @@ if (!databaseUrl) {
         // unless the time-windowed current snapshot superseded it. Conversely
         // M<2.5 does not become a fake map marker just to pass a test.
         const matched = rows.filter((x) => publicIds.has(x.usgsId));
-        if (matched.length) {
+        assert.ok(
+          matched.length > 0,
+          'Real public USGS event did not survive PostGIS to map readback',
+        );
+        {
           const sample = matched[0];
           assert.ok(readbackIds.has(sample.usgsId));
           const shown = sources[0].entities.getById(

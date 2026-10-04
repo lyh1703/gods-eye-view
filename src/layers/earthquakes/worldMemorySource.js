@@ -122,6 +122,7 @@ export function createWorldMemoryEarthquakeSource({
   now = () => new Date(),
   limit = 100,
   staleAfterSeconds = 900,
+  minMagnitude = null,
 } = {}) {
   if (typeof world?.query !== 'function') {
     throw new TypeError('ARGUS World Memory query engine required');
@@ -137,6 +138,13 @@ export function createWorldMemoryEarthquakeSource({
     throw new RangeError('Invalid earthquake staleness threshold');
   }
 
+  if (
+    minMagnitude != null &&
+    (!Number.isFinite(minMagnitude) || minMagnitude < -10 || minMagnitude > 10)
+  ) {
+    throw new RangeError('Invalid stored earthquake magnitude filter');
+  }
+
   let state = Object.freeze({
     status: 'unavailable',
     kind: 'OBSERVATION',
@@ -145,6 +153,7 @@ export function createWorldMemoryEarthquakeSource({
     stale_count: 0,
     analyzed_at: null,
     provider_state: 'UNKNOWN',
+    minimum_magnitude: minMagnitude,
   });
 
   return Object.freeze({
@@ -195,9 +204,14 @@ export function createWorldMemoryEarthquakeSource({
         seen.add(row.stableId);
       }
       signal?.throwIfAborted();
-      // Preserve the existing Earthquakes M2.5+ map policy. A lower-magnitude
-      // recorded event is not fabricated into a visible marker.
-      const visibleRows = rows.filter((row) => row.mag >= 2.5);
+      // Unlike the existing direct-feed layer (whose source applies M2.5+),
+      // opt-in persisted evidence exposes every actual stored magnitude by
+      // default. Filtering below M2.5 hid all 12 real USGS events in the
+      // first public CI sample; an empty map cannot prove UI readback.
+      const visibleRows =
+        minMagnitude == null
+          ? rows
+          : rows.filter((row) => row.mag >= minMagnitude);
       const staleCount = visibleRows.filter((row) => row.evidence.stale).length;
       state = Object.freeze({
         status: degraded ? 'degraded' : staleCount > 0 ? 'stale' : 'nominal',
@@ -207,6 +221,7 @@ export function createWorldMemoryEarthquakeSource({
         stale_count: staleCount,
         analyzed_at: new Date(analysisMs).toISOString(),
         provider_state: providerState,
+        minimum_magnitude: minMagnitude,
       });
       return visibleRows;
     },

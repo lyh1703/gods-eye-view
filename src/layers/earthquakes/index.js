@@ -27,7 +27,10 @@ export function createEarthquakesLayer({ source, overlayHost } = {}) {
 
   const layer = {
     id: 'earthquakes',
-    name: 'Earthquakes (24h)',
+    name:
+      typeof source.getEvidenceStatus === 'function'
+        ? 'Stored USGS Earthquakes'
+        : 'Earthquakes (24h)',
     icon: '🌋',
     source: 'USGS',
     updateInterval: 60000,
@@ -165,7 +168,9 @@ export function createEarthquakesLayer({ source, overlayHost } = {}) {
         _count = count;
         _lastUpdate = Date.now();
         _lastError = null;
-        console.log(`[Data:Earthquakes] Updated: ${_count} events (M2.5+)`);
+        console.log(
+          `[Data:Earthquakes] Updated: ${_count} ${source.getEvidenceStatus ? 'stored observations' : 'events (M2.5+)'}`,
+        );
         return true;
       } catch (e) {
         if (request.signal.aborted || _request !== request || !_enabled)

@@ -88,6 +88,7 @@ test('World Memory readback reaches actual Cesium entity, map label, rail and an
     assert.equal(await ui.layer.update(ui.viewer), true);
     assert.equal(ui.layer.getStats().count, 1);
     assert.equal(ui.layer.getStats().status, 'nominal');
+    assert.equal(ui.layer.name, 'Stored USGS Earthquakes');
     assert.match(ui.layer.getStats().source, /STORED OBSERVATION/);
     assert.match(ui.layer.getRowControls().info, /World Memory/);
     const displayed = ui.dataSources[0].entities.getById('earthquake:' + eventId);
