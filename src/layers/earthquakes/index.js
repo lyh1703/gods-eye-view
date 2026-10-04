@@ -10,6 +10,7 @@ import {
 } from './model.js';
 export * from './model.js';
 export { createUsgsEarthquakeSource } from './source.js';
+export { createWorldMemoryEarthquakeSource } from './worldMemorySource.js';
 
 /** Own one earthquake display and its refresh lifecycle. */
 export function createEarthquakesLayer({ source, overlayHost } = {}) {
@@ -85,6 +86,7 @@ export function createEarthquakesLayer({ source, overlayHost } = {}) {
           mag,
           place,
           time,
+          evidence = null,
         } of rows) {
           count++;
           const baseRadius = Math.pow(2, mag) * 1000;
@@ -118,17 +120,32 @@ export function createEarthquakesLayer({ source, overlayHost } = {}) {
                 place,
                 time,
                 depth: depthKm,
+                evidenceKind: 'OBSERVATION',
+                evidenceMode: evidence?.source_mode ?? 'DIRECT_USGS_FEED',
+                sourceUrl: evidence?.source_url ?? null,
+                timestampObserved: evidence?.timestamp_observed ?? null,
+                timestampReceived: evidence?.timestamp_received ?? null,
+                analyzedAt: evidence?.analyzed_at ?? null,
+                staleEvidence: evidence?.stale ?? null,
+                evidence,
               },
             }),
           );
-          overlayEntries.push(
-            createEarthquakeOverlayEntry({
+          overlayEntries.push({
+            ...createEarthquakeOverlayEntry({
               id: String(stableId),
               position,
               magnitude: mag,
               accent: color.toCssColorString(),
             }),
-          );
+            title: `M${mag.toFixed(1)} · ${
+              evidence?.stale
+                ? 'STALE OBS'
+                : evidence?.source_mode === 'STORED_WORLD_MEMORY'
+                  ? 'STORED OBS'
+                  : 'USGS OBS'
+            }`,
+          });
         }
 
         _dataSource.entities.removeAll();
@@ -203,29 +220,55 @@ export function createEarthquakesLayer({ source, overlayHost } = {}) {
           ? Cesium.Cartographic.fromCartesian(cartesian)
           : null;
         const p = entity.properties;
-        result.push(
-          mapAnalystRecord(
-            {
-              id: p?.usgsId?.getValue(now) ?? null,
-              mag: p?.mag?.getValue(now),
-              place: p?.place?.getValue(now),
-              time: p?.time?.getValue(now),
-              depth: p?.depth?.getValue(now),
-              lat: carto ? Cesium.Math.toDegrees(carto.latitude) : null,
-              lon: carto ? Cesium.Math.toDegrees(carto.longitude) : null,
-            },
-            result.length,
-          ),
+        const analystRecord = mapAnalystRecord(
+          {
+            id: p?.usgsId?.getValue(now) ?? null,
+            mag: p?.mag?.getValue(now),
+            place: p?.place?.getValue(now),
+            time: p?.time?.getValue(now),
+            depth: p?.depth?.getValue(now),
+            lat: carto ? Cesium.Math.toDegrees(carto.latitude) : null,
+            lon: carto ? Cesium.Math.toDegrees(carto.longitude) : null,
+          },
+          result.length,
         );
+        const evidence = p?.evidence?.getValue(now);
+        result.push(evidence ? { ...analystRecord, evidence } : analystRecord);
       }
       return result;
     },
 
+    getRowControls() {
+      const state = source.getEvidenceStatus?.();
+      if (!state) {
+        return {
+          info:
+            'USGS OBSERVATION · direct public feed; not a World Memory readback or independently verified event',
+        };
+      }
+      return {
+        info: `STORED OBSERVATION · ARGUS World Memory · ${
+          state.stale_count
+        } stale · upstream run: ${state.provider_state} · analysis: ${
+          state.analyzed_at ?? 'not yet read'
+        } · no independent event verification`,
+      };
+    },
+
     getStats() {
+      const state = source.getEvidenceStatus?.();
       return {
         count: _count,
         lastUpdate: _lastUpdate,
         error: _lastError,
+        source: state
+          ? 'ARGUS World Memory · STORED OBSERVATION'
+          : 'USGS · DIRECT OBSERVATION',
+        status: _lastError
+          ? 'degraded'
+          : (state?.status ?? 'nominal'),
+        stale: state?.status === 'stale',
+        degraded: Boolean(_lastError) || state?.status === 'degraded',
       };
     },
   };
