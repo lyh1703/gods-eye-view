@@ -89,7 +89,7 @@ test('World Memory readback reaches actual Cesium entity, map label, rail and an
     assert.equal(ui.layer.getStats().count, 1);
     assert.equal(ui.layer.getStats().status, 'nominal');
     assert.equal(ui.layer.name, 'Stored USGS Earthquakes');
-    assert.match(ui.layer.getStats().source, /STORED OBSERVATION/);
+    assert.match(ui.layer.getStats().source, /PERSISTED OBSERVATION/);
     assert.match(ui.layer.getRowControls().info, /World Memory/);
     const displayed = ui.dataSources[0].entities.getById('earthquake:' + eventId);
     assert.ok(displayed);
@@ -109,7 +109,8 @@ test('World Memory readback reaches actual Cesium entity, map label, rail and an
       displayed.properties.timestampReceived.getValue(),
       '2026-10-04T00:00:12.000Z',
     );
-    assert.match(ui.overlays.at(-1)[0].title, /STORED OBS/);
+    assert.match(ui.overlays.at(-1)[0].title, /PERSISTED OBS/);
+    assert.equal(displayed.properties.presentationClass.getValue(), 'PERSISTED_OBSERVATION');
     const analyst = ui.layer.getAnalystRecords();
     assert.equal(analyst.length, 1);
     assert.equal(analyst[0].evidence.source_url, sourceUrl);
@@ -156,7 +157,8 @@ test('latest fetch outage retains stored evidence as DEGRADED, old observations 
   try {
     assert.equal(await ui.layer.update(ui.viewer), true);
     assert.equal(ui.layer.getStats().status, 'degraded');
-    assert.match(ui.overlays.at(-1)[0].title, /STALE OBS/);
+    assert.match(ui.overlays.at(-1)[0].title, /STALE REF/);
+    assert.equal(ui.layer.getStats().stale, true);
     assert.equal(repository.observationCount(), 1);
   } finally {
     ui.layer.destroy(ui.viewer);
@@ -228,7 +230,7 @@ test('invalid WGS84, time reversal, spoofed provider and truncated query fail cl
   await assert.rejects(truncated.getSnapshot(), /Incomplete/);
 });
 
-test('UI does not publish invalid readback and retains prior mapped evidence', async () => {
+test('invalid readback retains provenance but demotes old map markers to stale reference', async () => {
   clock.value = new Date('2026-10-04T00:00:12.000Z');
   const { ingestor, world } = prepare();
   await ingestor.ingest(createUsgsEarthquakesAdapter({
@@ -252,9 +254,103 @@ test('UI does not publish invalid readback and retains prior mapped evidence', a
     const oldEntries = ui.overlays.length;
     fail = true;
     assert.equal(await ui.layer.update(ui.viewer), false);
-    assert.equal(ui.overlays.length, oldEntries);
+    assert.equal(ui.overlays.length, oldEntries + 1);
+    assert.match(ui.overlays.at(-1)[0].title, /STALE REF/);
+    assert.equal(
+      ui.dataSources[0].entities.values[0].properties.presentationClass.getValue(),
+      'STALE_REFERENCE',
+    );
     assert.equal(ui.layer.getStats().count, 1);
     assert.match(ui.layer.getStats().error, /lineage/);
+  } finally {
+    ui.layer.destroy(ui.viewer);
+  }
+});
+
+test('G5 refresh failure demotes displayed persisted evidence to stale reference; recovery restores classification', async () => {
+  clock.value = new Date('2026-10-04T00:00:12.000Z');
+  const { ingestor, source } = prepare();
+  await ingestor.ingest(createUsgsEarthquakesAdapter({
+    now: () => clock.value,
+    fetchImpl: async () => ({ ok: true, json: async () => feed() }),
+  }));
+  let offline = false;
+  const unreliableSource = {
+    getEvidenceStatus: () => source.getEvidenceStatus(),
+    getSnapshot(options) {
+      if (offline) throw new Error('simulated PostGIS disconnect');
+      return source.getSnapshot(options);
+    },
+  };
+  const ui = harness(unreliableSource);
+  try {
+    assert.equal(await ui.layer.update(ui.viewer), true);
+    let entity = ui.dataSources[0].entities.getById('earthquake:' + eventId);
+    assert.equal(entity.properties.presentationClass.getValue(), 'PERSISTED_OBSERVATION');
+    assert.match(ui.overlays.at(-1)[0].title, /PERSISTED OBS/);
+
+    offline = true;
+    assert.equal(await ui.layer.update(ui.viewer), false);
+    entity = ui.dataSources[0].entities.getById('earthquake:' + eventId);
+    assert.ok(entity, 'last persisted location remains available for reference');
+    assert.equal(entity.properties.presentationClass.getValue(), 'STALE_REFERENCE');
+    assert.equal(entity.properties.refreshFailedReference.getValue(), true);
+    assert.match(ui.overlays.at(-1)[0].title, /STALE REF/);
+    assert.match(ui.layer.getRowControls().info, /STALE REFERENCE/);
+    assert.equal(ui.layer.getStats().stale, true);
+    assert.equal(ui.layer.getStats().status, 'degraded');
+    assert.equal(ui.layer.getStats().source, 'CACHED · STALE REFERENCE');
+    const analyst = ui.layer.getAnalystRecords()[0];
+    assert.equal(analyst.presentation_class, 'STALE_REFERENCE');
+    assert.equal(analyst.refresh_failed_reference, true);
+    assert.equal(analyst.evidence.source_url, sourceUrl);
+
+    offline = false;
+    assert.equal(await ui.layer.update(ui.viewer), true);
+    entity = ui.dataSources[0].entities.getById('earthquake:' + eventId);
+    assert.equal(entity.properties.presentationClass.getValue(), 'PERSISTED_OBSERVATION');
+    assert.equal(entity.properties.refreshFailedReference.getValue(), false);
+    assert.match(ui.overlays.at(-1)[0].title, /PERSISTED OBS/);
+    assert.equal(ui.layer.getStats().status, 'nominal');
+    assert.equal(ui.layer.getStats().stale, false);
+  } finally {
+    ui.layer.destroy(ui.viewer);
+  }
+});
+
+test('G5 direct-feed mode explicitly labels observations and cached-failure references', async () => {
+  let broken = false;
+  const source = {
+    async getSnapshot() {
+      if (broken) throw new Error('USGS HTTP 503');
+      return [{
+        stableId: 'direct-example',
+        usgsId: 'direct-example',
+        lon: 127.1,
+        lat: 37.5,
+        depthKm: 4,
+        mag: 4.1,
+        place: 'Fixture - not a live observation',
+        time: 1_780_531_200_000,
+      }];
+    },
+  };
+  const ui = harness(source);
+  try {
+    assert.equal(await ui.layer.update(ui.viewer), true);
+    assert.match(ui.overlays.at(-1)[0].title, /DIRECT OBS/);
+    assert.equal(
+      ui.dataSources[0].entities.values[0].properties.presentationClass.getValue(),
+      'DIRECT_OBSERVATION',
+    );
+    assert.match(ui.layer.getRowControls().info, /DIRECT OBSERVATION/);
+    broken = true;
+    assert.equal(await ui.layer.update(ui.viewer), false);
+    assert.match(ui.overlays.at(-1)[0].title, /STALE REF/);
+    assert.equal(
+      ui.dataSources[0].entities.values[0].properties.presentationClass.getValue(),
+      'STALE_REFERENCE',
+    );
   } finally {
     ui.layer.destroy(ui.viewer);
   }
