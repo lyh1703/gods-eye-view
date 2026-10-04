@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ARGUS G5 Cesium Browser QA Fixture</title>
+    <style>
+      html, body { margin: 0; width: 100%; height: 100%; background: #070b16; color: white; }
+      #globe { position: absolute; inset: 0; }
+      #qa-panel { position: absolute; z-index: 100; top: 24px; left: 24px;
+        background: rgba(4, 14, 29, .96); padding: 14px; font: 16px sans-serif; }
+      #labels { margin-top: 10px; }
+      #labels span { display: block; padding: 6px; }
+    </style>
+  </head>
+  <body>
+    <div id="globe"></div>
+    <div id="qa-panel">
+      <strong>G5 BROWSER CLASSIFICATION TEST (DETERMINISTIC FIXTURE)</strong>
+      <div id="labels" role="status" aria-live="polite"></div>
+    </div>
+    <script type="module">
+      import * as Cesium from 'cesium';
+      import { createEarthquakesLayer } from '/src/layers/earthquakes/index.js';
+
+      const viewer = new Cesium.Viewer('globe', {
+        baseLayer: false,
+        terrainProvider: new Cesium.EllipsoidTerrainProvider(),
+        animation: false,
+        timeline: false,
+        infoBox: false,
+        selectionIndicator: false,
+        geocoder: false,
+        homeButton: false,
+        sceneModePicker: false,
+        navigationHelpButton: false,
+        fullscreenButton: false,
+      });
+      viewer.camera.setView({
+        destination: Cesium.Cartesian3.fromDegrees(127.1, 37.5, 550000),
+      });
+      let disconnect = false;
+      const source = {
+        getEvidenceStatus() {
+          return {
+            status: 'nominal',
+            provider_state: 'SUCCEEDED',
+            stale_count: 0,
+            analyzed_at: '2026-10-04T00:00:12.000Z',
+          };
+        },
+        async getSnapshot() {
+          if (disconnect) throw new Error('G5 browser injected DB disconnect');
+          return [{
+            stableId: 'g5-fixture',
+            usgsId: 'g5-fixture',
+            lon: 127.1,
+            lat: 37.5,
+            depthKm: 4,
+            mag: 4.1,
+            place: 'Browser harness fixture, not a real event',
+            time: Date.parse('2026-10-04T00:00:00Z'),
+            evidence: {
+              kind: 'OBSERVATION',
+              source_mode: 'STORED_WORLD_MEMORY',
+              stale: false,
+              source_url: 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_hour.geojson',
+            },
+          }];
+        },
+      };
+      const overlayHost = {
+        setVisible() {},
+        clearSource() { document.querySelector('#labels').replaceChildren(); },
+        setEntries(_id, entries) {
+          const labels = document.querySelector('#labels');
+          labels.replaceChildren(...entries.map((entry) => {
+            const node = document.createElement('span');
+            node.textContent = entry.title;
+            node.dataset.observationId = entry.id;
+            return node;
+          }));
+        },
+      };
+      const layer = createEarthquakesLayer({ source, overlayHost });
+      layer.init(viewer);
+      layer.enable(viewer);
+      await layer.update(viewer);
+      viewer.scene.requestRender();
+      window.__g5 = {
+        viewer,
+        layer,
+        setDisconnected(value) { disconnect = value; },
+        async refresh() {
+          const succeeded = await layer.update(viewer);
+          viewer.scene.requestRender();
+          return succeeded;
+        },
+      };
+    </script>
+  </body>
+</html>
