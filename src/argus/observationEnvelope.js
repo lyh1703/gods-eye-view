@@ -68,6 +68,24 @@ export function validateObservationEnvelope(observation) {
     errors.push('geometry must be null or a GeoJSON-like object');
   }
 
+  // Stored GeoJSON points are WGS84 longitude/latitude, never screen pixels
+  // or unbounded planar coordinates. Reject invalid public observations before
+  // writing them to World Memory; the UI must not be the only safety gate.
+  if (observation.geometry?.type === 'Point') {
+    const coords = observation.geometry.coordinates;
+    if (
+      !Array.isArray(coords) ||
+      coords.length < 2 ||
+      !Number.isFinite(coords[0]) ||
+      Math.abs(coords[0]) > 180 ||
+      !Number.isFinite(coords[1]) ||
+      Math.abs(coords[1]) > 90 ||
+      (coords[2] != null && !Number.isFinite(coords[2]))
+    ) {
+      errors.push('GeoJSON Point must contain valid WGS84 coordinates');
+    }
+  }
+
   if (!isPlainObject(observation.properties)) {
     errors.push('properties must be a plain object');
   }
