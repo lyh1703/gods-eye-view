@@ -51,7 +51,11 @@ test('G5 GeoJSON Point contract rejects out-of-range longitude and latitude', ()
     ingestion_run_id: 'run-valid',
   });
   assert.equal(validateObservationEnvelope(valid).ok, true);
-  for (const invalid of [[181, 0], [0, -91], [NaN, 37]]) {
+  for (const invalid of [
+    [181, 0],
+    [0, -91],
+    [NaN, 37],
+  ]) {
     const observation = {
       ...valid,
       geometry: { type: 'Point', coordinates: invalid },
