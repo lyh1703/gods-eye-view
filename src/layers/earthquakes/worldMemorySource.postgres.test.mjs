@@ -116,7 +116,7 @@ if (!databaseUrl) {
       try {
         assert.equal(await layer.update(viewer), true);
         assert.equal(layer.getStats().count, rows.length);
-        assert.match(layer.getStats().source, /STORED OBSERVATION/);
+        assert.match(layer.getStats().source, /PERSISTED OBSERVATION/);
         assert.match(layer.getRowControls().info, /World Memory/);
 
         const publicIds = new Set(liveRows.map((x) => x.entity_id));
