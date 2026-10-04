@@ -89,7 +89,7 @@ test('World Memory readback reaches actual Cesium entity, map label, rail and an
     assert.equal(ui.layer.getStats().count, 1);
     assert.equal(ui.layer.getStats().status, 'nominal');
     assert.equal(ui.layer.name, 'Stored USGS Earthquakes');
-    assert.match(ui.layer.getStats().source, /STORED OBSERVATION/);
+    assert.match(ui.layer.getStats().source, /PERSISTED OBSERVATION/);
     assert.match(ui.layer.getRowControls().info, /World Memory/);
     const displayed = ui.dataSources[0].entities.getById('earthquake:' + eventId);
     assert.ok(displayed);
@@ -230,7 +230,7 @@ test('invalid WGS84, time reversal, spoofed provider and truncated query fail cl
   await assert.rejects(truncated.getSnapshot(), /Incomplete/);
 });
 
-test('UI does not publish invalid readback and retains prior mapped evidence', async () => {
+test('invalid readback retains provenance but demotes old map markers to stale reference', async () => {
   clock.value = new Date('2026-10-04T00:00:12.000Z');
   const { ingestor, world } = prepare();
   await ingestor.ingest(createUsgsEarthquakesAdapter({
@@ -254,7 +254,12 @@ test('UI does not publish invalid readback and retains prior mapped evidence', a
     const oldEntries = ui.overlays.length;
     fail = true;
     assert.equal(await ui.layer.update(ui.viewer), false);
-    assert.equal(ui.overlays.length, oldEntries);
+    assert.equal(ui.overlays.length, oldEntries + 1);
+    assert.match(ui.overlays.at(-1)[0].title, /STALE REF/);
+    assert.equal(
+      ui.dataSources[0].entities.values[0].properties.presentationClass.getValue(),
+      'STALE_REFERENCE',
+    );
     assert.equal(ui.layer.getStats().count, 1);
     assert.match(ui.layer.getStats().error, /lineage/);
   } finally {
