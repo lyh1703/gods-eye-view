@@ -38,28 +38,55 @@ if (!databaseUrl) {
         repository,
         staleAfterSeconds: 3600,
       });
-      result = await ingestor.ingest({
+      const replay = {
         metadata: adapter.metadata,
         async query() { return liveRows; },
-      });
+      };
+      result = await ingestor.ingest(replay);
       assert.notEqual(result.status, 'DEGRADED');
       assert.ok(result.inserted + result.duplicates > 0);
+      // Replay the exact official observations; retries and restarts must
+      // not create another history record for identical public evidence.
+      const duplicate = await ingestor.ingest(replay);
+      assert.equal(duplicate.inserted, 0);
+      assert.equal(duplicate.duplicates, liveRows.length);
+      // Fault injection uses a copy of an ACTUAL public USGS envelope.
+      // Fail closed before persistence on impossible WGS84 coordinates.
+      const invalid = structuredClone(liveRows[0]);
+      invalid.geometry.coordinates[0] = 181;
+      const rejected = await ingestor.ingest({
+        metadata: adapter.metadata,
+        async query() { return [invalid]; },
+      });
+      assert.equal(rejected.status, 'DEGRADED');
+      assert.equal(rejected.inserted, 0);
+      // A later healthy public snapshot must clear the provider failure.
+      const recovered = await ingestor.ingest(replay);
+      assert.notEqual(recovered.status, 'DEGRADED');
+      assert.equal(recovered.inserted, 0);
     } finally {
       await writerPool.end();
     }
 
     // A new independent connection + query engine exercises readback after
     // writer shutdown. This is NOT a production deployment/restart claim.
-    const readerPool = new Pool({ connectionString: databaseUrl });
+    let readerPool = new Pool({ connectionString: databaseUrl });
     try {
-      const repository = createPostgresWorldMemoryRepository({
+      let repository = createPostgresWorldMemoryRepository({
         db: readerPool,
       });
-      const world = createWorldMemoryQueryEngine({
-        repository,
-      });
+      let world = createWorldMemoryQueryEngine({ repository });
+      // A reconnect creates a new repository/query engine but retains the
+      // same source and Cesium layer instance, with no uncommitted mutations.
+      const readSwitch = {
+        query: (...args) => world.query(...args),
+        repository: {
+          getLatestIngestionRunForProvider: (...args) =>
+            repository.getLatestIngestionRunForProvider(...args),
+        },
+      };
       const source = createWorldMemoryEarthquakeSource({
-        world,
+        world: readSwitch,
         staleAfterSeconds: 900,
       });
       const rows = await source.getSnapshot();
@@ -134,8 +161,37 @@ if (!databaseUrl) {
           assert.equal(mode, 'STORED_WORLD_MEMORY');
           assert.equal(entity.properties.evidenceKind.getValue(), 'OBSERVATION');
         }
+        // Real PostGIS pool disconnect, not a mocked World Memory error.
+        // On failure, the existing displayed USGS entities become explicitly
+        // stale references until an independent connection reads them again.
+        await readerPool.end();
+        assert.equal(await layer.update(viewer), false);
+        assert.equal(layer.getStats().status, 'degraded');
+        assert.equal(layer.getStats().stale, true);
+        assert.match(layer.getRowControls().info, /STALE REFERENCE/);
+        const staleEntity = sources[0].entities.getById(
+          'earthquake:' + matched[0].stableId,
+        );
+        assert.equal(
+          staleEntity.properties.presentationClass.getValue(),
+          'STALE_REFERENCE',
+        );
+        assert.match(
+          visible.at(-1).find((x) => x.id === matched[0].stableId).title,
+          /STALE REF/,
+        );
+        readerPool = new Pool({ connectionString: databaseUrl });
+        repository = createPostgresWorldMemoryRepository({ db: readerPool });
+        world = createWorldMemoryQueryEngine({ repository });
+        assert.equal(await layer.update(viewer), true);
+        assert.equal(layer.getStats().error, null);
+        assert.equal(
+          sources[0].entities.getById('earthquake:' + matched[0].stableId)
+            .properties.presentationClass.getValue(),
+          matched[0].evidence.stale ? 'STALE_REFERENCE' : 'PERSISTED_OBSERVATION',
+        );
         console.log(JSON.stringify({
-          path: 'official-USGS-GET>provider-envelope>G4-ingest>PostGIS>reopened-pool>WorldMemory>Cesium>overlay-and-analyst',
+          path: 'official-USGS-GET>provider-envelope>G4-ingest>PostGIS>disconnect>reconnected-pool>WorldMemory>Cesium>overlay-and-analyst',
           mode: 'real-public-source-e2e',
           public_sample_count: liveRows.length,
           stored_ui_count: rows.length,
@@ -144,6 +200,10 @@ if (!databaseUrl) {
           example_observed_at: matched[0]?.evidence.timestamp_observed ?? null,
           example_received_at: matched[0]?.evidence.timestamp_received ?? null,
           inferred_event_identity: false,
+          duplicate_replay_inserted: 0,
+          invalid_wgs84_rejected: true,
+          disconnected_pool_demoted_to_stale_reference: true,
+          fresh_pool_readback_restored: true,
         }));
       } finally {
         layer.destroy(viewer);
