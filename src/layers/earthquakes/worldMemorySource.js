@@ -1,6 +1,6 @@
-import { USGS_EARTHQUAKES_PROVIDER } from '../../argus/providers/usgsEarthquakes.js';
-
-const PROVIDER_ID = USGS_EARTHQUAKES_PROVIDER.provider_id;
+// Stable read-only ARGUS provider identifier. The UI package must not
+// import server-side ARGUS adapter code across the package ownership boundary.
+const PROVIDER_ID = 'usgs-earthquakes-all-hour';
 const MAX_LIMIT = 150;
 
 function observedTime(value) {
