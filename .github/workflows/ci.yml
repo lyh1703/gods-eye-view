@@ -43,7 +43,12 @@ jobs:
         run: npm run doctor -- --json
 
       - name: Check adopted formatting
-        run: npm run format:check
+        run: |
+          if ! npm run format:check; then
+            npm run format
+            git --no-pager diff -- src/layers/earthquakes/index.js src/layers/earthquakes/worldMemorySource.js
+            exit 1
+          fi
 
       - name: Check package boundaries
         run: npm run check:boundaries
@@ -77,7 +82,12 @@ jobs:
         run: node scripts/pinokio-install.mjs
 
       - name: Check adopted formatting
-        run: npm run format:check
+        run: |
+          if ! npm run format:check; then
+            npm run format
+            git --no-pager diff -- src/layers/earthquakes/index.js src/layers/earthquakes/worldMemorySource.js
+            exit 1
+          fi
 
       - name: Check package boundaries
         run: npm run check:boundaries
