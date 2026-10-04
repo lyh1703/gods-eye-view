@@ -32,6 +32,38 @@ test('ARGUS observation envelope preserves observed and received time', () => {
   assert.equal(validateObservationEnvelope(observation).ok, true);
 });
 
+test('G5 GeoJSON Point contract rejects out-of-range longitude and latitude', () => {
+  const valid = createObservationEnvelope({
+    provider_id: 'usgs-earthquakes-all-hour',
+    entity_type: 'earthquake',
+    entity_id: 'quake',
+    observation_type: 'earthquake-event',
+    timestamp_observed: '2026-10-04T00:00:00Z',
+    timestamp_received: '2026-10-04T00:00:02Z',
+    geometry: { type: 'Point', coordinates: [180, -90, 3] },
+    properties: { magnitude: 4.2 },
+    source_url: 'https://earthquake.usgs.gov/earthquakes/eventpage/quake',
+    license_class: 'us-government-public-domain',
+    commercial_allowed: true,
+    attribution_required: true,
+    retention_policy: 'test-only',
+    rate_limit_class: 'public-feed',
+    ingestion_run_id: 'run-valid',
+  });
+  assert.equal(validateObservationEnvelope(valid).ok, true);
+  for (const invalid of [[181, 0], [0, -91], [NaN, 37]]) {
+    const observation = {
+      ...valid,
+      geometry: { type: 'Point', coordinates: invalid },
+    };
+    assert.equal(validateObservationEnvelope(observation).ok, false);
+    assert.match(
+      validateObservationEnvelope(observation).errors.join('; '),
+      /WGS84/,
+    );
+  }
+});
+
 test('provider registry blocks accidental duplicate providers', () => {
   const registry = createProviderRegistry();
   const provider = {
