@@ -179,17 +179,20 @@ export function createWorldMemoryEarthquakeSource({
         seen.add(row.stableId);
       }
       signal?.throwIfAborted();
-      const staleCount = rows.filter((row) => row.evidence.stale).length;
+      // Preserve the existing Earthquakes M2.5+ map policy. A lower-magnitude
+      // recorded event is not fabricated into a visible marker.
+      const visibleRows = rows.filter((row) => row.mag >= 2.5);
+      const staleCount = visibleRows.filter((row) => row.evidence.stale).length;
       state = Object.freeze({
         status: degraded ? 'degraded' : staleCount > 0 ? 'stale' : 'nominal',
         kind: 'OBSERVATION',
         source_mode: 'STORED_WORLD_MEMORY',
-        count: rows.length,
+        count: visibleRows.length,
         stale_count: staleCount,
         analyzed_at: new Date(analysisMs).toISOString(),
         provider_state: providerState,
       });
-      return rows.filter((row) => row.mag >= 2.5);
+      return visibleRows;
     },
   });
 }
