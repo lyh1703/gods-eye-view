@@ -138,6 +138,7 @@ jobs:
         run: node --test src/argus/multiSourceFusion.test.mjs
 
       - name: Run multi-source fusion PostGIS and real USGS plus MBTA gate
+        if: matrix.node-version == '26'
         env:
           ARGUS_POSTGRES_TEST_URL: postgresql://argus:argus@127.0.0.1:55433/argus_test
         run: node --test src/argus/multiSourceFusion.postgres.test.mjs
@@ -149,21 +150,25 @@ jobs:
         run: node --test src/argus/capabilityRecoveryG.test.mjs
 
       - name: Run G PostGIS and public MBTA E2E gate
+        if: matrix.node-version == '26'
         env:
           ARGUS_POSTGRES_TEST_URL: postgresql://argus:argus@127.0.0.1:55433/argus_test
         run: node --test src/argus/recoveryG.postgres.test.mjs
 
       - name: Run live USGS to PostGIS E2E gate
+        if: matrix.node-version == '26'
         env:
           ARGUS_POSTGRES_TEST_URL: postgresql://argus:argus@127.0.0.1:55433/argus_test
         run: node --test src/argus/externalProviderIngest.postgres.test.mjs
 
       - name: Run USGS PostGIS restart readback into actual Cesium map entities
+        if: matrix.node-version == '26'
         env:
           ARGUS_POSTGRES_TEST_URL: postgresql://argus:argus@127.0.0.1:55433/argus_test
         run: node --test src/layers/earthquakes/worldMemorySource.postgres.test.mjs
 
       - name: Run public CelesTrak to PostGIS NEXUS E2E gate
+        if: matrix.node-version == '26'
         env:
           ARGUS_POSTGRES_TEST_URL: postgresql://argus:argus@127.0.0.1:55433/argus_test
         run: node --test src/argus/celestrakPublic.postgres.test.mjs
