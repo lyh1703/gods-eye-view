@@ -1,5 +1,9 @@
 name: ARGUS G5 Browser Render Gate
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 on:
   pull_request:
     branches: ['argus/main']
@@ -15,7 +19,7 @@ permissions:
 
 jobs:
   cesium-browser:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, maker-team]
     timeout-minutes: 15
     env:
       PUPPETEER_SKIP_DOWNLOAD: '1'
