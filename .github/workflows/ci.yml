@@ -15,7 +15,7 @@ concurrency:
 jobs:
   verify:
     name: Node ${{ matrix.node }}
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, maker-team]
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -56,7 +56,7 @@ jobs:
 
   windows-onboarding:
     name: Windows onboarding
-    runs-on: windows-latest
+    runs-on: [self-hosted, windows, x64, maker-team]
     timeout-minutes: 20
     env:
       PUPPETEER_SKIP_DOWNLOAD: '1'
