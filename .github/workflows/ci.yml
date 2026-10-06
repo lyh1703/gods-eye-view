@@ -45,6 +45,7 @@ jobs:
           dpkg-deb -x "$pkg" root
           libdir="$(dirname "$(find "$work/root" -name 'libatomic.so.1' -print -quit)")"
           test -f "$libdir/libatomic.so.1"
+          echo "ARGUS_NODE26_LIBDIR=$libdir" >> "$GITHUB_ENV"
           echo "LD_LIBRARY_PATH=$libdir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
 
       - name: Use Node.js
@@ -52,6 +53,22 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           cache: npm
+
+      - name: Preserve Node 26 runtime for sanitized child environments
+        if: startsWith(matrix.node, '26')
+        shell: bash
+        run: |
+          set -euo pipefail
+          real_node="$(command -v node)"
+          wrapper="$RUNNER_TEMP/node26-wrapper"
+          mkdir -p "$wrapper"
+          cat > "$wrapper/node" <<EOF
+          #!/usr/bin/env bash
+          export LD_LIBRARY_PATH="$ARGUS_NODE26_LIBDIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          exec "$real_node" "\$@"
+          EOF
+          chmod +x "$wrapper/node"
+          echo "$wrapper" >> "$GITHUB_PATH"
 
       - name: Install locked dependencies
         run: npm ci
