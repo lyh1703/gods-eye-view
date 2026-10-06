@@ -1,5 +1,9 @@
 name: Public CommonGrid source evidence
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 on:
   pull_request:
     paths:
@@ -13,7 +17,7 @@ permissions:
 
 jobs:
   public-source:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, maker-team]
     timeout-minutes: 8
     steps:
       - name: Check out source

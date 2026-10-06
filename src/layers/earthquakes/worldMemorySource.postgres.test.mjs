@@ -153,7 +153,7 @@ if (!databaseUrl) {
           );
           assert.match(
             visible.at(-1).find((x) => x.id === sample.stableId).title,
-            /OBS/,
+            sample.evidence.stale ? /STALE REF/ : /OBS/,
           );
         }
         for (const entity of sources[0].entities.values) {
