@@ -21,8 +21,6 @@ jobs:
   cesium-browser:
     runs-on: [self-hosted, linux, x64, maker-team]
     timeout-minutes: 15
-    env:
-      PUPPETEER_SKIP_DOWNLOAD: '1'
     steps:
       - name: Check out source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -35,8 +33,17 @@ jobs:
           node-version: '24.14.0'
           cache: npm
 
-      - name: Install locked dependencies
+      - name: Install locked dependencies and compatible Chromium
         run: npm ci
+
+      - name: Resolve Puppeteer Chromium
+        shell: bash
+        run: |
+          set -euo pipefail
+          chromium="$(node --input-type=module -e "import puppeteer from 'puppeteer'; console.log(puppeteer.executablePath())")"
+          test -x "$chromium"
+          echo "PUPPETEER_EXECUTABLE_PATH=$chromium" >> "$GITHUB_ENV"
+          echo "Using Chromium: $chromium"
 
       - name: Prove real Chromium Cesium WebGL and visible provenance labels
         run: node scripts/qa-argus-g5-browser.mjs
