@@ -25,7 +25,7 @@ concurrency:
 jobs:
   migration:
     name: Clean PostGIS migration
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, maker-team]
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -40,7 +40,7 @@ jobs:
           POSTGRES_PASSWORD: argus
           POSTGRES_DB: argus_test
         ports:
-          - 5432:5432
+          - 55433:5432
         options: >-
           --health-cmd "pg_isready -U argus -d argus_test"
           --health-interval 5s
@@ -49,7 +49,7 @@ jobs:
 
     env:
       PGHOST: 127.0.0.1
-      PGPORT: '5432'
+      PGPORT: '55433'
       PGUSER: argus
       PGPASSWORD: argus
       PGDATABASE: argus_test
@@ -60,23 +60,37 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Verify PostgreSQL client
-        run: psql --version
+      - name: Resolve PostGIS service container
+        shell: bash
+        run: |
+          set -euo pipefail
+          cid="$(docker ps --filter 'publish=55433' --filter 'ancestor=postgis/postgis:16-3.4' --format '{{.ID}}' | head -n 1)"
+          if [ -z "$cid" ]; then
+            echo "::error::ARGUS PostGIS service container was not found on port 55433"
+            exit 1
+          fi
+          echo "ARGUS_POSTGIS_CID=$cid" >> "$GITHUB_ENV"
+          docker exec "$cid" psql --version
 
       - name: Apply migration on clean database
-        run: psql -v ON_ERROR_STOP=1 -f db/argus_world/001_world_memory.sql
+        shell: bash
+        run: docker exec -i "$ARGUS_POSTGIS_CID" psql -U argus -d argus_test -v ON_ERROR_STOP=1 < db/argus_world/001_world_memory.sql
 
       - name: Verify geometry time provenance and supersession
-        run: psql -v ON_ERROR_STOP=1 -f db/argus_world/001_world_memory_test.sql
+        shell: bash
+        run: docker exec -i "$ARGUS_POSTGIS_CID" psql -U argus -d argus_test -v ON_ERROR_STOP=1 < db/argus_world/001_world_memory_test.sql
 
       - name: Reset ARGUS schema
-        run: psql -v ON_ERROR_STOP=1 -c "DROP SCHEMA argus_world CASCADE;"
+        shell: bash
+        run: docker exec "$ARGUS_POSTGIS_CID" psql -U argus -d argus_test -v ON_ERROR_STOP=1 -c "DROP SCHEMA argus_world CASCADE;"
 
       - name: Reapply migration after reset
-        run: psql -v ON_ERROR_STOP=1 -f db/argus_world/001_world_memory.sql
+        shell: bash
+        run: docker exec -i "$ARGUS_POSTGIS_CID" psql -U argus -d argus_test -v ON_ERROR_STOP=1 < db/argus_world/001_world_memory.sql
 
       - name: Re-run migration gate
-        run: psql -v ON_ERROR_STOP=1 -f db/argus_world/001_world_memory_test.sql
+        shell: bash
+        run: docker exec -i "$ARGUS_POSTGIS_CID" psql -U argus -d argus_test -v ON_ERROR_STOP=1 < db/argus_world/001_world_memory_test.sql
 
       - name: Use Node.js for repository integration
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -92,12 +106,12 @@ jobs:
 
       - name: Run Postgres repository contract suite
         env:
-          ARGUS_POSTGRES_TEST_URL: postgresql://argus:argus@127.0.0.1:5432/argus_test
+          ARGUS_POSTGRES_TEST_URL: postgresql://argus:argus@127.0.0.1:55433/argus_test
         run: node --test src/argus/memory/postgresRepository.test.mjs
 
       - name: Run temporal and spatial World Memory query gate
         env:
-          ARGUS_POSTGRES_TEST_URL: postgresql://argus:argus@127.0.0.1:5432/argus_test
+          ARGUS_POSTGRES_TEST_URL: postgresql://argus:argus@127.0.0.1:55433/argus_test
         run: node --test src/argus/memory/worldMemoryQuery.postgres.test.mjs
 
       - name: Run external provider contract suite
@@ -108,7 +122,7 @@ jobs:
 
       - name: Run multi-source fusion PostGIS and real USGS plus MBTA gate
         env:
-          ARGUS_POSTGRES_TEST_URL: postgresql://argus:argus@127.0.0.1:5432/argus_test
+          ARGUS_POSTGRES_TEST_URL: postgresql://argus:argus@127.0.0.1:55433/argus_test
         run: node --test src/argus/multiSourceFusion.postgres.test.mjs
 
       - name: Run AIS FIRMS Space recovery contract suite
@@ -119,25 +133,25 @@ jobs:
 
       - name: Run G PostGIS and public MBTA E2E gate
         env:
-          ARGUS_POSTGRES_TEST_URL: postgresql://argus:argus@127.0.0.1:5432/argus_test
+          ARGUS_POSTGRES_TEST_URL: postgresql://argus:argus@127.0.0.1:55433/argus_test
         run: node --test src/argus/recoveryG.postgres.test.mjs
 
       - name: Run live USGS to PostGIS E2E gate
         env:
-          ARGUS_POSTGRES_TEST_URL: postgresql://argus:argus@127.0.0.1:5432/argus_test
+          ARGUS_POSTGRES_TEST_URL: postgresql://argus:argus@127.0.0.1:55433/argus_test
         run: node --test src/argus/externalProviderIngest.postgres.test.mjs
 
       - name: Run USGS PostGIS restart readback into actual Cesium map entities
         env:
-          ARGUS_POSTGRES_TEST_URL: postgresql://argus:argus@127.0.0.1:5432/argus_test
+          ARGUS_POSTGRES_TEST_URL: postgresql://argus:argus@127.0.0.1:55433/argus_test
         run: node --test src/layers/earthquakes/worldMemorySource.postgres.test.mjs
 
       - name: Run public CelesTrak to PostGIS NEXUS E2E gate
         env:
-          ARGUS_POSTGRES_TEST_URL: postgresql://argus:argus@127.0.0.1:5432/argus_test
+          ARGUS_POSTGRES_TEST_URL: postgresql://argus:argus@127.0.0.1:55433/argus_test
         run: node --test src/argus/celestrakPublic.postgres.test.mjs
 
       - name: Run ARGUS to NEXUS verified-query E2E gate
         env:
-          ARGUS_POSTGRES_TEST_URL: postgresql://argus:argus@127.0.0.1:5432/argus_test
+          ARGUS_POSTGRES_TEST_URL: postgresql://argus:argus@127.0.0.1:55433/argus_test
         run: node --test src/argus/nexusVerifiedQuery.postgres.test.mjs
