@@ -30,6 +30,23 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Stage libatomic for Node 26
+        if: startsWith(matrix.node, '26')
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/libatomic-node26"
+          rm -rf "$work"
+          mkdir -p "$work"
+          cd "$work"
+          apt-get download libatomic1
+          pkg="$(find . -maxdepth 1 -name 'libatomic1_*.deb' -print -quit)"
+          test -n "$pkg"
+          dpkg-deb -x "$pkg" root
+          libdir="$(dirname "$(find "$work/root" -name 'libatomic.so.1' -print -quit)")"
+          test -f "$libdir/libatomic.so.1"
+          echo "LD_LIBRARY_PATH=$libdir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
+
       - name: Use Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
