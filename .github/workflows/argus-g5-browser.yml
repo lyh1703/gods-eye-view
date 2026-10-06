@@ -33,7 +33,7 @@ jobs:
           node-version: '24.14.0'
           cache: npm
 
-      - name: Install locked dependencies and compatible Chromium
+      - name: Install locked dependencies and compatible headless Chrome
         shell: bash
         run: |
           set -euo pipefail
@@ -41,18 +41,14 @@ jobs:
           rm -rf "$cache"
           mkdir -p "$cache"
           export PUPPETEER_CACHE_DIR="$cache"
-          echo "PUPPETEER_CACHE_DIR=$cache" >> "$GITHUB_ENV"
+          export PUPPETEER_SKIP_DOWNLOAD=1
           npm ci
-          npx --no-install puppeteer browsers install chrome
-
-      - name: Resolve Puppeteer Chromium
-        shell: bash
-        run: |
-          set -euo pipefail
-          chromium="$(node --input-type=module -e "import puppeteer from 'puppeteer'; console.log(puppeteer.executablePath())")"
-          test -x "$chromium"
-          echo "PUPPETEER_EXECUTABLE_PATH=$chromium" >> "$GITHUB_ENV"
-          echo "Using Chromium: $chromium"
+          unset PUPPETEER_SKIP_DOWNLOAD
+          browser_path="$(npx --no-install puppeteer browsers install chrome-headless-shell --format '{{path}}' | tail -n 1)"
+          test -x "$browser_path"
+          echo "PUPPETEER_CACHE_DIR=$cache" >> "$GITHUB_ENV"
+          echo "PUPPETEER_EXECUTABLE_PATH=$browser_path" >> "$GITHUB_ENV"
+          echo "Using headless Chrome: $browser_path"
 
       - name: Prove real Chromium Cesium WebGL and visible provenance labels
         run: node scripts/qa-argus-g5-browser.mjs
