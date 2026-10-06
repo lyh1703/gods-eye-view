@@ -43,6 +43,7 @@ jobs:
           export PUPPETEER_CACHE_DIR="$cache"
           export PUPPETEER_SKIP_DOWNLOAD=1
           npm ci
+          npm install --no-save --package-lock=false --no-audit --no-fund yauzl@3.2.0
           unset PUPPETEER_SKIP_DOWNLOAD
           browser_path="$(npx --no-install puppeteer browsers install chrome-headless-shell --format '{{path}}' | tail -n 1)"
           test -x "$browser_path"
