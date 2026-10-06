@@ -21,8 +21,6 @@ jobs:
   cesium-browser:
     runs-on: [self-hosted, linux, x64, maker-team]
     timeout-minutes: 15
-    env:
-      PUPPETEER_CACHE_DIR: ${{ runner.temp }}/argus-g5-puppeteer
     steps:
       - name: Check out source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -39,8 +37,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf "$PUPPETEER_CACHE_DIR"
-          mkdir -p "$PUPPETEER_CACHE_DIR"
+          cache="$RUNNER_TEMP/argus-g5-puppeteer"
+          rm -rf "$cache"
+          mkdir -p "$cache"
+          export PUPPETEER_CACHE_DIR="$cache"
+          echo "PUPPETEER_CACHE_DIR=$cache" >> "$GITHUB_ENV"
           npm ci
           npx --no-install puppeteer browsers install chrome
 
