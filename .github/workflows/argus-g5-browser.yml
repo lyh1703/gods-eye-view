@@ -20,39 +20,45 @@ permissions:
 jobs:
   cesium-browser:
     runs-on: [self-hosted, linux, x64, maker-team]
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Check out source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
 
-      - name: Use Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: '24.14.0'
-          cache: npm
-
-      - name: Install locked dependencies and compatible headless Chrome
+      - name: Build isolated Chromium runtime
         shell: bash
         run: |
           set -euo pipefail
-          cache="$RUNNER_TEMP/argus-g5-puppeteer"
-          rm -rf "$cache"
-          mkdir -p "$cache"
-          export PUPPETEER_CACHE_DIR="$cache"
-          export PUPPETEER_SKIP_DOWNLOAD=1
-          npm ci
-          npm install --no-save --package-lock=false --no-audit --no-fund yauzl@3.2.0
-          unset PUPPETEER_SKIP_DOWNLOAD
-          browser_path="$(npx --no-install puppeteer browsers install chrome-headless-shell --format '{{path}}' | tail -n 1)"
-          test -x "$browser_path"
-          echo "PUPPETEER_CACHE_DIR=$cache" >> "$GITHUB_ENV"
-          echo "PUPPETEER_EXECUTABLE_PATH=$browser_path" >> "$GITHUB_ENV"
-          echo "Using headless Chrome: $browser_path"
+          IMAGE="argus-g5-browser:${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          docker build --pull -t "$IMAGE" - <<'DOCKERFILE'
+          FROM node:24-bookworm
+          RUN apt-get update \
+              && apt-get install -y --no-install-recommends chromium ca-certificates \
+              && rm -rf /var/lib/apt/lists/*
+          WORKDIR /work
+          ENV PUPPETEER_SKIP_DOWNLOAD=1
+          ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+          DOCKERFILE
+          echo "ARGUS_G5_IMAGE=$IMAGE" >> "$GITHUB_ENV"
 
       - name: Prove real Chromium Cesium WebGL and visible provenance labels
-        run: node scripts/qa-argus-g5-browser.mjs
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            --shm-size=1g \
+            --security-opt no-new-privileges \
+            --user "$(id -u):$(id -g)" \
+            -e HOME=/tmp \
+            -e npm_config_cache=/tmp/npm-cache \
+            -e PUPPETEER_SKIP_DOWNLOAD=1 \
+            -e PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
+            -v "$GITHUB_WORKSPACE:/work" \
+            -w /work \
+            "$ARGUS_G5_IMAGE" \
+            sh -lc 'npm ci && node scripts/qa-argus-g5-browser.mjs'
 
       - name: Save browser render screenshot on success or failure
         if: always()
@@ -61,3 +67,8 @@ jobs:
           name: argus-g5-browser-render
           path: qa-shots/argus-g5/
           if-no-files-found: ignore
+
+      - name: Cleanup browser runtime
+        if: always()
+        shell: bash
+        run: docker image rm -f "${ARGUS_G5_IMAGE:-}" >/dev/null 2>&1 || true
