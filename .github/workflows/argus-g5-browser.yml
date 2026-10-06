@@ -34,7 +34,11 @@ jobs:
           cache: npm
 
       - name: Install locked dependencies and compatible Chromium
-        run: npm ci
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npx --no-install puppeteer browsers install chrome
 
       - name: Resolve Puppeteer Chromium
         shell: bash
