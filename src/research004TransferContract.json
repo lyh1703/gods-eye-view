@@ -1,0 +1,80 @@
+{
+  "schema_version": "research004-transfer-v1",
+  "transfer_id": "004-ST12-ARGUS-ENVIRONMENTAL-V1",
+  "source": {
+    "repository": "lyh1703/nasa-earthdata-research-runner",
+    "stage9_run": 37559041532,
+    "stage10_run": 37567180867,
+    "stage11_run": 37568803532
+  },
+  "receiver": {
+    "repository": "lyh1703/gods-eye-view",
+    "canonical_branch": "argus/main",
+    "intended_role": "derived environmental context for analyst/world-memory use",
+    "direct_observation": false
+  },
+  "evidence": {
+    "water": {
+      "proxy": "hydroclimate_water_deficit_screening_proxy",
+      "stage9": {
+        "evaluable_regions": 11,
+        "expected_direction_fraction": 1,
+        "median_spearman_rho": 0.7182224834,
+        "gate_pass": true
+      },
+      "stage10": {
+        "evaluable_regions": 10,
+        "gate_pass": true
+      },
+      "stage11": {
+        "robust_regions": 9,
+        "gate_pass": true,
+        "sensitivity_note": "R1_SAH 17-month low-frequency rho approximately 0.632"
+      }
+    },
+    "disaster": {
+      "proxy": "wet_saturation_screening_proxy",
+      "stage9": {
+        "evaluable_regions": 11,
+        "positive_effect_region_fraction": 0.7272727273,
+        "median_event_minus_nonevent_wet_score": 0.3355487108,
+        "median_event_minus_nonevent_candidate_fraction": 0.0578048721,
+        "gate_pass": true
+      },
+      "stage10": {
+        "evaluable_regions": 10,
+        "gate_pass": true
+      },
+      "stage11": {
+        "robust_regions": 9,
+        "gate_pass": true,
+        "sensitivity_note": "R1_SAH low-frequency rho approximately 0.492 at 9 months and 0.461 at 17 months"
+      }
+    }
+  },
+  "integration_policy": {
+    "classification": "DERIVED_PROXY_EVIDENCE",
+    "must_not_label_as": [
+      "DIRECT_OBSERVATION",
+      "CONFIRMED_FLOOD_EVENT",
+      "EVENT_ATTRIBUTION",
+      "FORECAST"
+    ],
+    "may_support": [
+      "environmental context",
+      "screening overlays",
+      "analyst context",
+      "research prioritization"
+    ],
+    "may_not_assert": [
+      "water_quality_inference",
+      "formal_drought_confirmation",
+      "exhaustive_flood_detection",
+      "dry_heat_external_validation",
+      "climate_change_trend",
+      "causal_attribution",
+      "event_attribution",
+      "forecast_skill"
+    ]
+  }
+}
