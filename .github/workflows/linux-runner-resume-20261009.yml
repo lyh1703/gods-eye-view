@@ -1,0 +1,58 @@
+name: Maker Team Targeted Linux Runner Resume 2026-10-09
+on:
+  push:
+    branches: ['ops/runner-readonly-diagnostic-20261009']
+    paths: ['.github/workflows/linux-runner-resume-20261009.yml']
+permissions: {}
+concurrency:
+  group: maker-linux-targeted-runner-resume-20261009
+  cancel-in-progress: false
+jobs:
+  resume:
+    name: Resume three confirmed missing Linux listeners
+    runs-on: [self-hosted, windows, x64, maker-team]
+    timeout-minutes: 5
+    steps:
+      - name: Start only validated stopped per-repository listeners
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          Write-Output "RECOVERY_SCOPE=project-ktesis,project-atlas,gods-eye-view;NO_GIT_MUTATIONS;NO_SECRETS"
+          $script = @'
+          set -eu
+          is_listening() {
+            target="$1"
+            for pid in $(pgrep -f 'Runner.Listener' || true); do
+              [ -d "/proc/$pid" ] || continue
+              wd=$(readlink -f "/proc/$pid/cwd" 2>/dev/null || true)
+              [ "$wd" = "$target" ] && return 0
+            done
+            return 1
+          }
+          for repo in project-ktesis project-atlas gods-eye-view; do
+            dir="/home/yunho/maker-runners/$repo"
+            if [ ! -d "$dir" ] || [ ! -f "$dir/.runner" ] || [ ! -x "$dir/run.sh" ]; then
+              printf 'RUNNER_%s=BLOCKED_INCOMPLETE_INSTALL\n' "$repo"
+              continue
+            fi
+            if is_listening "$dir"; then
+              printf 'RUNNER_%s=ALREADY_RUNNING\n' "$repo"
+              continue
+            fi
+            logfile="$dir/runner-resume-20261009.log"
+            (cd "$dir"; nohup ./run.sh </dev/null > "$logfile" 2>&1 &)
+            printf 'RUNNER_%s=START_REQUESTED\n' "$repo"
+          done
+          sleep 10
+          for repo in project-ktesis project-atlas gods-eye-view; do
+            dir="/home/yunho/maker-runners/$repo"
+            if is_listening "$dir"; then
+              printf 'RUNNER_%s=LISTENER_RUNNING\n' "$repo"
+            else
+              printf 'RUNNER_%s=LISTENER_NOT_RUNNING\n' "$repo"
+            fi
+          done
+          '@
+          $script = $script.Replace("`r`n", "`n")
+          & wsl.exe --distribution Ubuntu-24.04 --user yunho --exec bash -lc $script
+          if ($LASTEXITCODE -ne 0) { throw ("TARGETED_RESUME_SCRIPT_EXIT=" + $LASTEXITCODE) }
