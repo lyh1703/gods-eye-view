@@ -1,0 +1,44 @@
+name: Maker Team Linux Runner Read-Only Diagnosis 2026-10-09
+on:
+  push:
+    branches: ['ops/runner-readonly-diagnostic-20261009']
+    paths: ['.github/workflows/linux-runner-diagnostic-20261009.yml']
+permissions: {}
+concurrency:
+  group: maker-linux-runner-readonly-diagnostic-20261009
+  cancel-in-progress: false
+jobs:
+  inspect:
+    name: Windows host to Linux listener read-only probe
+    runs-on: [self-hosted, windows, x64, maker-team]
+    timeout-minutes: 5
+    steps:
+      - name: Read WSL runtime and three individual Linux runner listeners
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          Write-Output "DIAGNOSTIC_MODE=READ_ONLY;NO_RESTART;NO_SECRETS;NO_FILES_CHANGED"
+          $wsl = Get-Command wsl.exe -ErrorAction SilentlyContinue
+          if (-not $wsl) { Write-Output "WSL_EXECUTABLE=NOT_FOUND"; exit 0 }
+          Write-Output "WSL_DISTRIBUTIONS_BEGIN"
+          & wsl.exe --list --quiet
+          Write-Output "WSL_DISTRIBUTIONS_END"
+          $probe = @'
+          set -u
+          printf 'LINUX_PROBE=CONNECTED\\n'
+          for repo in project-ktesis project-atlas gods-eye-view; do
+            dir="/home/yunho/maker-runners/$repo"
+            if [ -d "$dir" ]; then
+              printf 'RUNNER_DIR_%s=EXISTS\\n' "$repo"
+              [ -f "$dir/.runner" ] && printf 'RUNNER_CONFIG_%s=EXISTS\\n' "$repo" || printf 'RUNNER_CONFIG_%s=MISSING\\n' "$repo"
+              [ -x "$dir/run.sh" ] && printf 'RUNNER_SCRIPT_%s=EXISTS\\n' "$repo" || printf 'RUNNER_SCRIPT_%s=MISSING\\n' "$repo"
+            else
+              printf 'RUNNER_DIR_%s=MISSING\\n' "$repo"
+            fi
+          done
+          printf 'RUNNER_LISTENER_PIDS_BEGIN\\n'
+          ps -eo pid,comm,args | grep -E '[R]unner.Listener|[r]un.sh' | sed -E 's/(--token|--pat|--password|--secret)([ =])[^ ]+/\\1\\2[REDACTED]/g' | head -n 24 || true
+          printf 'RUNNER_LISTENER_PIDS_END\\n'
+          '@
+          & wsl.exe --exec bash -lc $probe
+          if ($LASTEXITCODE -ne 0) { Write-Output ("WSL_PROBE_EXIT=" + $LASTEXITCODE) }
