@@ -18,27 +18,31 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           Write-Output "DIAGNOSTIC_MODE=READ_ONLY;NO_RESTART;NO_SECRETS;NO_FILES_CHANGED"
-          $wsl = Get-Command wsl.exe -ErrorAction SilentlyContinue
-          if (-not $wsl) { Write-Output "WSL_EXECUTABLE=NOT_FOUND"; exit 0 }
-          Write-Output "WSL_DISTRIBUTIONS_BEGIN"
-          & wsl.exe --list --quiet
-          Write-Output "WSL_DISTRIBUTIONS_END"
+          if (-not (Get-Command wsl.exe -ErrorAction SilentlyContinue)) { Write-Output "WSL_EXECUTABLE=NOT_FOUND"; exit 0 }
+          Write-Output "WSL_DISTRO=Ubuntu-24.04"
           $probe = @'
           set -u
-          printf 'LINUX_PROBE=CONNECTED\\n'
+          printf 'LINUX_PROBE=CONNECTED\n'
           for repo in project-ktesis project-atlas gods-eye-view; do
             dir="/home/yunho/maker-runners/$repo"
             if [ -d "$dir" ]; then
-              printf 'RUNNER_DIR_%s=EXISTS\\n' "$repo"
-              [ -f "$dir/.runner" ] && printf 'RUNNER_CONFIG_%s=EXISTS\\n' "$repo" || printf 'RUNNER_CONFIG_%s=MISSING\\n' "$repo"
-              [ -x "$dir/run.sh" ] && printf 'RUNNER_SCRIPT_%s=EXISTS\\n' "$repo" || printf 'RUNNER_SCRIPT_%s=MISSING\\n' "$repo"
+              printf 'RUNNER_DIR_%s=EXISTS\n' "$repo"
+              [ -f "$dir/.runner" ] && printf 'RUNNER_CONFIG_%s=EXISTS\n' "$repo" || printf 'RUNNER_CONFIG_%s=MISSING\n' "$repo"
+              [ -x "$dir/run.sh" ] && printf 'RUNNER_SCRIPT_%s=EXISTS\n' "$repo" || printf 'RUNNER_SCRIPT_%s=MISSING\n' "$repo"
             else
-              printf 'RUNNER_DIR_%s=MISSING\\n' "$repo"
+              printf 'RUNNER_DIR_%s=MISSING\n' "$repo"
             fi
           done
-          printf 'RUNNER_LISTENER_PIDS_BEGIN\\n'
-          ps -eo pid,comm,args | grep -E '[R]unner.Listener|[r]un.sh' | sed -E 's/(--token|--pat|--password|--secret)([ =])[^ ]+/\\1\\2[REDACTED]/g' | head -n 24 || true
-          printf 'RUNNER_LISTENER_PIDS_END\\n'
+          printf 'LISTENERS_BEGIN\n'
+          for pid in $(pgrep -f 'Runner.Listener' || true); do
+            [ -d "/proc/$pid" ] || continue
+            wd=$(readlink -f "/proc/$pid/cwd" 2>/dev/null || true)
+            case "$wd" in
+              /home/yunho/maker-runners/*) printf 'LISTENER_PID=%s;CWD=%s\n' "$pid" "$wd";;
+            esac
+          done
+          printf 'LISTENERS_END\n'
           '@
-          & wsl.exe --exec bash -lc $probe
-          if ($LASTEXITCODE -ne 0) { Write-Output ("WSL_PROBE_EXIT=" + $LASTEXITCODE) }
+          $probe = $probe.Replace("`r`n", "`n")
+          & wsl.exe --distribution Ubuntu-24.04 --exec bash -lc $probe
+          if ($LASTEXITCODE -ne 0) { throw ("WSL_PROBE_FAILED_EXIT=" + $LASTEXITCODE) }
