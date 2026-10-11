@@ -1,0 +1,41 @@
+name: Maker Team HumanTech Linux Runner Read-Only Inspect 2026-10-11
+on:
+  push:
+    branches: ['ops/runner-readonly-diagnostic-20261009']
+    paths: ['.github/workflows/humantech-linux-runner-inspect-20261011.yml']
+permissions: {}
+concurrency:
+  group: maker-team-humantech-runner-inspect
+  cancel-in-progress: false
+jobs:
+  inspect:
+    name: Inspect existing HumanTech runner only - no mutation
+    runs-on: [self-hosted, windows, x64, maker-team]
+    timeout-minutes: 5
+    steps:
+      - name: Inspect WSL HumanTech listener without touching state
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Write-Output 'SCOPE=HUMANTECH_LINUX_RUNNER_READ_ONLY;NO_RESTART;NO_CREDENTIALS;NO_REPOSITORY_CHANGES'
+          if (-not (Get-Command wsl.exe -ErrorAction SilentlyContinue)) {
+            Write-Output 'WSL=NOT_PRESENT'; exit 0
+          }
+          $probe = @'
+          set -u
+          expected="/home/yunho/maker-runners/AdaptiveTwin-HumanTech-Research"
+          echo "PROBE=CONNECTED"
+          if [ -d "$expected" ]; then echo "HUMANTECH_DIR=EXISTS"; else echo "HUMANTECH_DIR=MISSING"; fi
+          if [ -f "$expected/.runner" ]; then echo "HUMANTECH_CONFIG=EXISTS"; else echo "HUMANTECH_CONFIG=MISSING"; fi
+          if [ -x "$expected/run.sh" ]; then echo "HUMANTECH_SCRIPT=EXISTS"; else echo "HUMANTECH_SCRIPT=MISSING"; fi
+          listening=0
+          for pid in $(pgrep -f 'Runner.Listener' || true); do
+            [ -d "/proc/$pid" ] || continue
+            dir=$(readlink -f "/proc/$pid/cwd" 2>/dev/null || true)
+            [ "$dir" = "$expected" ] && listening=1
+          done
+          if [ "$listening" -eq 1 ]; then echo "HUMANTECH_LISTENER=RUNNING"; else echo "HUMANTECH_LISTENER=NOT_RUNNING"; fi
+          '@
+          $probe = $probe.Replace("`r`n","`n")
+          & wsl.exe --distribution Ubuntu-24.04 --user yunho --exec bash -lc $probe
+          if ($LASTEXITCODE -ne 0) { Write-Output 'WSL_PROBE=FAILED'; exit 1 }
