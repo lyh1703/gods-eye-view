@@ -1,0 +1,47 @@
+name: Maker Team SKIRON Linux Listener Single Runner Resume Oct12
+on:
+  push:
+    branches: ['ops/runner-readonly-diagnostic-20261009']
+    paths: ['.github/workflows/skiron-linux-listener-resume-20261012.yml']
+permissions: {}
+concurrency:
+  group: maker-skiron-listener-targeted-resume
+  cancel-in-progress: false
+jobs:
+  resume:
+    runs-on: [self-hosted, windows, x64, maker-team]
+    timeout-minutes: 5
+    steps:
+      - name: Idempotent restart only stopped SKIRON Linux listener, no repo or secret changes
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          Write-Output 'SCOPE=SKIRON_LISTENER_ONLY;NO_GIT_CHANGES;NO_API_KEYS;NO_OTHER_LISTENERS'
+          $script = @'
+          set -eu
+          dir="/home/yunho/maker-runners/project-skiron"
+          is_live() {
+            for pid in $(pgrep -f 'Runner.Listener' || true); do
+              [ -d "/proc/$pid" ] || continue
+              wd=$(readlink -f "/proc/$pid/cwd" 2>/dev/null || true)
+              [ "$wd" = "$dir" ] && return 0
+            done
+            return 1
+          }
+          if [ ! -d "$dir" ] || [ ! -f "$dir/.runner" ] || [ ! -x "$dir/run.sh" ]; then
+            echo 'SKIRON=BLOCKED_MISSING_RUNNER_SETUP'
+            exit 22
+          fi
+          if is_live; then
+            echo 'SKIRON=ALREADY_RUNNING'
+          else
+            logfile="$dir/skiron-resume-20261012.log"
+            (cd "$dir"; nohup ./run.sh </dev/null > "$logfile" 2>&1 &)
+            echo 'SKIRON=START_REQUESTED'
+          fi
+          sleep 10
+          if is_live; then echo 'SKIRON_LISTENER=RUNNING'; else echo 'SKIRON_LISTENER=NOT_RUNNING'; exit 23; fi
+          '@
+          $script=$script.Replace("`r`n","`n")
+          & wsl.exe --distribution Ubuntu-24.04 --user yunho --exec bash -lc $script
+          if ($LASTEXITCODE -ne 0) { throw ('SKIRON_RUNNER_RECOVERY_FAILED=' + $LASTEXITCODE) }
