@@ -1,0 +1,36 @@
+name: Maker Team SKIRON Linux Listener Read-Only Diagnosis Oct12
+on:
+  push:
+    branches: ['ops/runner-readonly-diagnostic-20261009']
+    paths: ['.github/workflows/skiron-linux-listener-readonly-20261012.yml']
+permissions: {}
+concurrency:
+  group: maker-skiron-listener-inspection
+  cancel-in-progress: false
+jobs:
+  inspect:
+    runs-on: [self-hosted, windows, x64, maker-team]
+    timeout-minutes: 5
+    steps:
+      - name: Observe configured SKIRON listener without credentials, restart or source changes
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          Write-Output 'READ_ONLY=TRUE;PROJECT=SKIRON;NO_RESTART;NO_CREDENTIALS;NO_FILES_CHANGED'
+          $script = @'
+          set -u
+          dir="/home/yunho/maker-runners/project-skiron"
+          if [ -d "$dir" ]; then echo "RUNNER_DIR=EXISTS"; else echo "RUNNER_DIR=MISSING"; fi
+          if [ -f "$dir/.runner" ]; then echo "RUNNER_CONFIG=EXISTS"; else echo "RUNNER_CONFIG=MISSING"; fi
+          if [ -x "$dir/run.sh" ]; then echo "RUNNER_SCRIPT=EXISTS"; else echo "RUNNER_SCRIPT=MISSING"; fi
+          active=0
+          for pid in $(pgrep -f 'Runner.Listener' || true); do
+            [ -d "/proc/$pid" ] || continue
+            wd=$(readlink -f "/proc/$pid/cwd" 2>/dev/null || true)
+            [ "$wd" = "$dir" ] && active=1
+          done
+          if [ "$active" -eq 1 ]; then echo "RUNNER_LISTENER=RUNNING"; else echo "RUNNER_LISTENER=NOT_RUNNING"; fi
+          '@
+          $script=$script.Replace("`r`n","`n")
+          & wsl.exe --distribution Ubuntu-24.04 --user yunho --exec bash -lc $script
+          if ($LASTEXITCODE -ne 0) { throw ('SKIRON_READONLY_WSL_PROBE_FAILED=' + $LASTEXITCODE) }
