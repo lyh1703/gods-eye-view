@@ -1,0 +1,69 @@
+{
+  "schema_version": "research004-transfer-v1",
+  "transfer_id": "004-ST12-ARGUS-ENVIRONMENTAL-V1",
+  "target": "ARGUS",
+  "source_runs": {
+    "stage9": 37559041532,
+    "stage10": 37567180867,
+    "stage11": 37568803532
+  },
+  "evidence": {
+    "water": {
+      "proxy": "hydroclimate_water_deficit_screening_proxy",
+      "stage9": {
+        "evaluable_regions": 11,
+        "directional_fraction": 1,
+        "median_spearman_rho": 0.7182224834,
+        "gate_pass": true
+      },
+      "stage10": {
+        "evaluable_regions": 10,
+        "gate_pass": true
+      },
+      "stage11": {
+        "robust_regions": 9,
+        "gate_pass": true,
+        "sensitivity": "R1_SAH 17m low-frequency rho~0.632"
+      }
+    },
+    "disaster": {
+      "proxy": "wet_saturation_screening_proxy",
+      "stage9": {
+        "evaluable_regions": 11,
+        "positive_effect_fraction": 0.7272727273,
+        "median_wet_score_effect": 0.3355487108,
+        "median_candidate_fraction_effect": 0.0578048721,
+        "gate_pass": true
+      },
+      "stage10": {
+        "evaluable_regions": 10,
+        "gate_pass": true
+      },
+      "stage11": {
+        "robust_regions": 9,
+        "gate_pass": true,
+        "sensitivity": "R1_SAH low-frequency rho~0.492 at 9m and ~0.461 at 17m"
+      }
+    }
+  },
+  "receiver_policy": {
+    "classification": "DERIVED_PROXY_EVIDENCE",
+    "direct_observation": false,
+    "forbidden_labels": [
+      "DIRECT_OBSERVATION",
+      "CONFIRMED_FLOOD_EVENT",
+      "EVENT_ATTRIBUTION",
+      "FORECAST"
+    ],
+    "forbidden_claims": [
+      "water_quality_inference",
+      "formal_drought_confirmation",
+      "exhaustive_flood_detection",
+      "dry_heat_external_validation",
+      "climate_change_trend",
+      "causal_attribution",
+      "event_attribution",
+      "forecast_skill"
+    ]
+  }
+}
