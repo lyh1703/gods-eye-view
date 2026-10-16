@@ -59,15 +59,19 @@ export function classifyObservationFreshness(
   const nowMs = now instanceof Date ? now.getTime() : new Date(now).getTime();
   const ageSeconds =
     Number.isFinite(observed) && Number.isFinite(nowMs)
-      ? Math.max(0, (nowMs - observed) / 1000)
+      ? (nowMs - observed) / 1000
       : null;
-
+  // A future-dated source observation cannot establish that a feed is
+  // currently fresh. Previously max(0, ...) disguised negative age as zero.
+  // Preserve age_seconds=null when the time is invalid or lies in the future.
+  const futureDated = ageSeconds != null && ageSeconds < 0;
+  const usableAge = futureDated ? null : ageSeconds;
   return {
-    age_seconds: ageSeconds,
+    age_seconds: usableAge,
     stale:
-      ageSeconds == null
+      usableAge == null
         ? true
-        : ageSeconds > Math.max(0, Number(staleAfterSeconds) || 0),
+        : usableAge > Math.max(0, Number(staleAfterSeconds) || 0),
   };
 }
 
