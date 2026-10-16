@@ -248,7 +248,7 @@ test('provider future observation cannot produce successful fresh ingest status'
   });
   const ingestor = createExternalProviderIngestor({
     repository,
-    now: () => new Date('2026-09-23T08:53:20.000Z'),
+    now: () => new Date('2026-09-23T08:53:10.000Z'),
     uuid,
     staleAfterSeconds: 900,
   });
