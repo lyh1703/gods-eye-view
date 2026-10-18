@@ -60,6 +60,14 @@ export function validateObservationEnvelope(observation) {
     }
   }
 
+  const observedMs = Date.parse(observation.timestamp_observed ?? '');
+  const receivedMs = Date.parse(observation.timestamp_received ?? '');
+  // Never treat a future source observation as a zero-second-old fresh record.
+  // Reject both newly constructed and raw envelopes before they enter storage.
+  if (Number.isFinite(observedMs) && Number.isFinite(receivedMs) && observedMs > receivedMs) {
+    errors.push('timestamp_observed must be at or before timestamp_received');
+  }
+
   if (
     observation.geometry !== null &&
     (!isPlainObject(observation.geometry) ||
