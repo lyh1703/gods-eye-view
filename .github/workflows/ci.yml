@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main, 'argus/main']
+    branches: [main, 'argus/main', 'fix/rt06-postgis-service-isolation-20261019']
 
 permissions:
   contents: read
