@@ -1,0 +1,32 @@
+name: V2.1 ARGUS Isolated CI Probe
+
+on:
+  push:
+    branches:
+      - 'fix/rt06-postgis-service-isolation-20261019'
+  pull_request:
+    branches:
+      - 'argus/main'
+
+permissions:
+  contents: read
+
+jobs:
+  mock-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PUPPETEER_SKIP_DOWNLOAD: '1'
+      GEV_REQUIRE_ALLOCATION_GATE: '0'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.14.0'
+          cache: npm
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run check:boundaries
+      - run: node --test src/argus/externalProviderIngest.test.mjs
