@@ -13,6 +13,8 @@ on:
       - 'src/layers/earthquakes/worldMemorySource*'
       - 'src/layers/earthquakes/index.js'
       - '.github/workflows/argus-postgis.yml'
+  push:
+    branches: ['fix/rt06-postgis-service-isolation-20261019']
   workflow_dispatch:
 
 permissions:
