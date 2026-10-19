@@ -14,7 +14,17 @@ on:
       - 'src/layers/earthquakes/index.js'
       - '.github/workflows/argus-postgis.yml'
   push:
-    branches: ['fix/rt06-postgis-service-isolation-20261019']
+    branches: ['argus/main']
+    paths:
+      - 'db/argus_world/**'
+      - 'src/argus/memory/**'
+      - 'src/argus/providers/**'
+      - 'src/argus/externalProviderIngest*'
+      - 'src/argus/nexusVerifiedQuery*'
+      - 'src/argus/multiSourceFusion*'
+      - 'src/layers/earthquakes/worldMemorySource*'
+      - 'src/layers/earthquakes/index.js'
+      - '.github/workflows/argus-postgis.yml'
   workflow_dispatch:
 
 permissions:
