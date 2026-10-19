@@ -3,7 +3,7 @@ name: V2.1 ARGUS Isolated CI Probe
 on:
   push:
     branches:
-      - 'fix/rt06-postgis-service-isolation-20261019'
+      - 'argus/main'
   pull_request:
     branches:
       - 'argus/main'
