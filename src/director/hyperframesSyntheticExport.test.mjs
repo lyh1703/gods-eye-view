@@ -15,7 +15,7 @@ test('deterministic editable HyperFrames storyboard and truthful overlay', () =>
   const a = buildSyntheticHyperframesComposition(fixture);
   const b = buildSyntheticHyperframesComposition(fixture);
   assert.equal(a.html, b.html);
-  assert.equal(a.manifest.html_sha256, b.manifest.html_sha256);
+  assert.deepEqual(a.manifest, b.manifest);
   assert.equal(a.manifest.source_class, 'SYNTHETIC_ILLUSTRATION');
   assert.ok(a.html.includes('data-composition-id="argus-synthetic"'));
   assert.ok(a.html.includes('window.__timelines["argus-synthetic"]=timeline'));
