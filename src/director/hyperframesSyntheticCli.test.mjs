@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync, readFileSync, rmSync, existsSync} from 'node:fs';
+import {mkdtempSync, readFileSync, rmSync, existsSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join, resolve} from 'node:path';
 import {spawnSync} from 'node:child_process';
@@ -30,7 +30,6 @@ test('CLI rejects pretending observed data are synthetic', () => {
     const fixture = resolve('scripts/fixtures/hyperframes/synthetic-bars.json');
     const data=JSON.parse(readFileSync(fixture,'utf8'));
     data.kind='OBSERVED';
-    const {writeFileSync}=await import('node:fs');
     const bad=join(out,'bad.json');writeFileSync(bad,JSON.stringify(data));
     const command=resolve('scripts/export-hyperframes-synthetic.mjs');
     const result=spawnSync(process.execPath,[command,'--fixture',bad,'--out',join(out,'export')],{encoding:'utf8'});
