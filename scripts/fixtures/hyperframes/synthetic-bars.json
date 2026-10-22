@@ -1,0 +1,22 @@
+{
+  "kind": "SYNTHETIC_ILLUSTRATION",
+  "title": "ARGUS Synthetic Data Showcase",
+  "bars": [
+    {
+      "label": "Zone A",
+      "value": 38
+    },
+    {
+      "label": "Zone B",
+      "value": 72
+    },
+    {
+      "label": "Zone C",
+      "value": 55
+    },
+    {
+      "label": "Zone D",
+      "value": 91
+    }
+  ]
+}
