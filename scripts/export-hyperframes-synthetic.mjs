@@ -1,25 +1,22 @@
 #!/usr/bin/env node
 // Offline scaffold by default; optional manual local HyperFrames CLI render.
 // Never downloads deps, opens a browser, fetches real ARGUS map/feeds or uploads.
-import {mkdir, writeFile, readFile, stat} from 'node:fs/promises';
+import {mkdir, writeFile, readFile} from 'node:fs/promises';
 import {resolve, join} from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {buildSyntheticHyperframesComposition} from '../src/director/hyperframesSyntheticExport.js';
 
 const args = process.argv.slice(2);
-if (!['--fixture', '--fixture='].some(x => args.includes(x) || args.some(y => y.startsWith(x)))) {
-  // Render requires explicit synthetic fixture; no implicit live source.
-}
 function flag(name) {
   const index = args.indexOf(name);
   if (index === -1 || !args[index + 1]) throw new Error('Missing required ' + name);
   return args[index + 1];
 }
 async function main() {
-  if (args.some(x => !['--fixture','--out','--render'].includes(x) && !args.includes('--fixture') && !args.includes('--out'))) {
-    // Command parser accepts only fixed options; the fixture/out values are
-    // validated when their named options are read.
+  if (args.filter(x => x === '--fixture').length !== 1 || args.filter(x => x === '--out').length !== 1
+      || args.some((x, i) => i % 2 === 0 && !['--fixture', '--out', '--render'].includes(x))) {
+    throw new Error('Expected exactly one --fixture, --out and optional --render');
   }
   const file = resolve(flag('--fixture'));
   const out = resolve(flag('--out'));
