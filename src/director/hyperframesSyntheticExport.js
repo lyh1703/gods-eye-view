@@ -1,7 +1,6 @@
 // Opt-in HyperFrames-compatible, editable explainer composition.
 // This module never reads live ARGUS data, installs packages or renders media.
 // Synthetic/illustrative classification is required, never inferred.
-import { createHash } from 'node:crypto';
 
 const MAX_ITEMS = 8;
 
@@ -80,7 +79,6 @@ timeline.set({}, {},10);
 window.__timelines["argus-synthetic"]=timeline;
 timeline.seek(0);
 </script></body></html>\n`;
-  const sha256 = createHash('sha256').update(html, 'utf8').digest('hex');
   return {
     html, manifest: {
       schema: 'argus-hyperframes-synthetic-v1',
@@ -88,7 +86,6 @@ timeline.seek(0);
       no_observed_geodata: true,
       composition_id: 'argus-synthetic', duration_seconds: 10,
       width: 1920, height: 1080,
-      html_sha256: sha256,
       output_file: 'index.html',
       renderer: 'hyperframes CLI (external, not auto-installed)',
     }
