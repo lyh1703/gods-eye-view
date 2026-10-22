@@ -22,13 +22,15 @@ async function main() {
   const out = resolve(flag('--out'));
   const input = JSON.parse(await readFile(file, 'utf8'));
   const {html, manifest} = buildSyntheticHyperframesComposition(input);
+  const htmlSha256 = createHash('sha256').update(html, 'utf8').digest('hex');
+  const receipt = {...manifest, html_sha256:htmlSha256};
   await mkdir(out, {recursive:true});
   await writeFile(join(out, 'index.html'), html, {flag:'w'});
   await writeFile(join(out, 'evidence.json'), JSON.stringify({
-    ...manifest, fixture_source_class: input.kind,
+    ...receipt, fixture_source_class: input.kind,
     note: 'Scaffold generated, MP4 not yet rendered; external renderer required.',
   }, null, 2) + '\n');
-  console.log(JSON.stringify({scaffold:out,sha256:manifest.html_sha256,rendered:false}));
+  console.log(JSON.stringify({scaffold:out,sha256:htmlSha256,rendered:false}));
   if (args.includes('--render')) {
     const child = spawnSync('hyperframes', ['render','--output','output.mp4'], {
       cwd: out, encoding:'utf8', timeout:120000, windowsHide:true,
