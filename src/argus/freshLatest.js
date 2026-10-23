@@ -3,18 +3,31 @@
 const MAX_LIMIT = 500;
 const MAX_STALE_SECONDS = 7 * 24 * 3600;
 
-export function validateFreshLatestOptions({ limit = 100, staleAfterSeconds = 900 } = {}) {
+export function validateFreshLatestOptions({
+  limit = 100,
+  staleAfterSeconds = 900,
+} = {}) {
   if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIMIT) {
     throw new RangeError(`limit must be an integer from 1 to ${MAX_LIMIT}`);
   }
-  if (!Number.isFinite(staleAfterSeconds) || staleAfterSeconds < 0 || staleAfterSeconds > MAX_STALE_SECONDS) {
-    throw new RangeError('staleAfterSeconds must be a finite number from 0 to 604800');
+  if (
+    !Number.isFinite(staleAfterSeconds) ||
+    staleAfterSeconds < 0 ||
+    staleAfterSeconds > MAX_STALE_SECONDS
+  ) {
+    throw new RangeError(
+      'staleAfterSeconds must be a finite number from 0 to 604800',
+    );
   }
   return { limit, staleAfterSeconds };
 }
 
 function zonedTime(value) {
-  if (typeof value !== 'string' || !/(?:Z|[+-]\d{2}:\d{2})$/i.test(value)) return null;
+  if (
+    typeof value !== 'string' ||
+    !/(?:Z|[+-]\d{2}:\d{2})$/i.test(value)
+  )
+    return null;
   const milliseconds = Date.parse(value);
   return Number.isFinite(milliseconds) ? milliseconds : null;
 }
@@ -24,11 +37,16 @@ function identity(value) {
   return value.trim();
 }
 
-export function selectFreshLatest(providerResults, { asOf, limit = 100, staleAfterSeconds = 900 } = {}) {
+export function selectFreshLatest(
+  providerResults,
+  { asOf, limit = 100, staleAfterSeconds = 900 } = {},
+) {
   const options = validateFreshLatestOptions({ limit, staleAfterSeconds });
-  if (!Array.isArray(providerResults)) throw new TypeError('providerResults must be an array');
+  if (!Array.isArray(providerResults))
+    throw new TypeError('providerResults must be an array');
   const clock = zonedTime(asOf);
-  if (clock === null) throw new TypeError('asOf must be a timezone-aware timestamp');
+  if (clock === null)
+    throw new TypeError('asOf must be a timezone-aware timestamp');
   const latest = new Map();
   const excluded = { invalid: 0, provider_mismatch: 0, future: 0, stale: 0 };
   const providers = providerResults.map((result) => ({
@@ -68,15 +86,24 @@ export function selectFreshLatest(providerResults, { asOf, limit = 100, staleAft
       }
     }
   }
-  const ordered = [...latest.values()].sort((a, b) => b.observedMs - a.observedMs || a.key.localeCompare(b.key));
+  const ordered = [...latest.values()].sort(
+    (a, b) =>
+      b.observedMs - a.observedMs || a.key.localeCompare(b.key),
+  );
   return {
     as_of: new Date(clock).toISOString(),
     stale_after_seconds: options.staleAfterSeconds,
-    status: providers.some((p) => !p.ok) ? 'PARTIAL_PROVIDER_FAILURE' : ordered.length ? 'OK' : 'NO_FRESH_DATA',
+    status: providers.some((p) => !p.ok)
+      ? 'PARTIAL_PROVIDER_FAILURE'
+      : ordered.length
+        ? 'OK'
+        : 'NO_FRESH_DATA',
     providers,
     excluded,
     total_fresh_entities: ordered.length,
     truncated: ordered.length > options.limit,
-    observations: ordered.slice(0, options.limit).map((entry) => entry.observation),
+    observations: ordered
+      .slice(0, options.limit)
+      .map((entry) => entry.observation),
   };
 }
