@@ -3,9 +3,7 @@
  * exported PLY bytes so later loaders cannot treat a synthetic scene as
  * observed geolocation. Node-only processing, no external downloads.
  */
-import { createHash } from 'node:crypto';
-
-export function inspectMatrix3dPly(input, metadata) {
+export async function inspectMatrix3dPly(input, metadata) {
   if (!(input instanceof Uint8Array) || input.length < 30 || input.length > 64 * 1024 * 1024) {
     throw new Error('bounded nonempty PLY bytes required');
   }
@@ -30,7 +28,8 @@ export function inspectMatrix3dPly(input, metadata) {
       !/^[a-f0-9]{64}$/.test(metadata.sha256)) {
     throw new Error('source pin, synthetic origin and checksum are required');
   }
-  const actualHash = createHash('sha256').update(input).digest('hex');
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', input);
+  const actualHash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
   if (actualHash !== metadata.sha256) throw new Error('PLY content checksum mismatch');
   return Object.freeze({
     contract: 'argus-matrix3d-ply-synthetic-receiver-v1',
