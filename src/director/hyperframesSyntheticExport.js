@@ -6,43 +6,63 @@ const MAX_ITEMS = 8;
 
 export class HyperframesSyntheticError extends Error {}
 
-const escapeHtml = (s) => String(s)
-  .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-  .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-  .replace(/'/g, '&#39;');
+const escapeHtml = (s) =>
+  String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 
 export function validateSyntheticStoryboard(input) {
-  if (!input || typeof input !== 'object' || Array.isArray(input)
-    || input.kind !== 'SYNTHETIC_ILLUSTRATION'
-    || typeof input.title !== 'string' || !input.title.trim()
-    || input.title.length > 100
-    || !Array.isArray(input.bars) || input.bars.length < 2
-    || input.bars.length > MAX_ITEMS) {
-    throw new HyperframesSyntheticError('explicit bounded synthetic storyboard required');
+  if (
+    !input ||
+    typeof input !== 'object' ||
+    Array.isArray(input) ||
+    input.kind !== 'SYNTHETIC_ILLUSTRATION' ||
+    typeof input.title !== 'string' ||
+    !input.title.trim() ||
+    input.title.length > 100 ||
+    !Array.isArray(input.bars) ||
+    input.bars.length < 2 ||
+    input.bars.length > MAX_ITEMS
+  ) {
+    throw new HyperframesSyntheticError(
+      'explicit bounded synthetic storyboard required',
+    );
   }
   const bars = input.bars.map((item) => {
-    if (!item || typeof item.label !== 'string'
-      || !item.label.trim() || item.label.length > 32
-      || typeof item.value !== 'number' || !Number.isFinite(item.value)
-      || item.value < 0 || item.value > 100) {
+    if (
+      !item ||
+      typeof item.label !== 'string' ||
+      !item.label.trim() ||
+      item.label.length > 32 ||
+      typeof item.value !== 'number' ||
+      !Number.isFinite(item.value) ||
+      item.value < 0 ||
+      item.value > 100
+    ) {
       throw new HyperframesSyntheticError('invalid synthetic bar');
     }
-    return {label: item.label, value: item.value};
+    return { label: item.label, value: item.value };
   });
-  if (new Set(bars.map(x => x.label)).size !== bars.length) {
+  if (new Set(bars.map((x) => x.label)).size !== bars.length) {
     throw new HyperframesSyntheticError('duplicate synthetic labels');
   }
-  if (Object.keys(input).some(k => !['kind', 'title', 'bars'].includes(k))) {
+  if (Object.keys(input).some((k) => !['kind', 'title', 'bars'].includes(k))) {
     throw new HyperframesSyntheticError('undeclared field is forbidden');
   }
-  return {kind: input.kind, title: input.title.trim(), bars};
+  return { kind: input.kind, title: input.title.trim(), bars };
 }
 
 export function buildSyntheticHyperframesComposition(input) {
   const data = validateSyntheticStoryboard(input);
-  const bars = data.bars.map((item, i) =>
-    `<div class="bar-col"><div class="bar" style="--height:${item.value}%"></div><span>${escapeHtml(item.label)}</span><strong>${item.value.toFixed(1)}%</strong></div>`
-  ).join('\n');
+  const bars = data.bars
+    .map(
+      (item, i) =>
+        `<div class="bar-col"><div class="bar" style="--height:${item.value}%"></div><span>${escapeHtml(item.label)}</span><strong>${item.value.toFixed(1)}%</strong></div>`,
+    )
+    .join('\n');
   // Based on official HyperFrames HTML composition contract: a paused GSAP
   // timeline registered under data-composition-id with seekable animation.
   // A CDN script is required for the GSAP runtime: network policy and asset
@@ -80,14 +100,17 @@ window.__timelines["argus-synthetic"]=timeline;
 timeline.seek(0);
 </script></body></html>\n`;
   return {
-    html, manifest: {
+    html,
+    manifest: {
       schema: 'argus-hyperframes-synthetic-v1',
       source_class: 'SYNTHETIC_ILLUSTRATION',
       no_observed_geodata: true,
-      composition_id: 'argus-synthetic', duration_seconds: 10,
-      width: 1920, height: 1080,
+      composition_id: 'argus-synthetic',
+      duration_seconds: 10,
+      width: 1920,
+      height: 1080,
       output_file: 'index.html',
       renderer: 'hyperframes CLI (external, not auto-installed)',
-    }
+    },
   };
 }
