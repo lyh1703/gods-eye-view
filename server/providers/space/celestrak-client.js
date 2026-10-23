@@ -73,12 +73,14 @@ export function createCelestrakClient({
   }
   async function cached(group) {
     const memory = mem.get(group);
-    if (memory && valid(memory, group)) return memory;
+    if (memory && valid(memory, group) && now() - memory.at < CELESTRAK_TTL_MS)
+      return memory;
     const entry = await readJson(entryPath(group));
     if (valid(entry, group)) {
       mem.set(group, entry);
       return entry;
     }
+    if (memory && valid(memory, group)) return memory;
     // Upgrade the previous {at, body} format conservatively. Its provenance
     // cannot establish a verified public receipt, but its timestamp still
     // forbids a needless download inside the existing six-hour interval.

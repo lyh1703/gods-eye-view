@@ -411,3 +411,22 @@ test('parallel groups share a serial queue, and a first failure prevents later g
   );
   assert.equal(f.calls(), 1);
 });
+
+test('an expired in-memory entry adopts a newer receipt written by another client', async (t) => {
+  const f = await fixture(t, async () => new Response(TLE));
+  const first = await f.client.readGroup('stations');
+  const peer = f.restart();
+  assert.equal((await peer.readGroup('stations')).entry.at, first.entry.at);
+  f.advance(CELESTRAK_TTL_MS);
+  const refreshed = await f.client.readGroup('stations');
+  assert.equal(refreshed.cache, 'MISS');
+  const adopted = await peer.readGroup('stations');
+  assert.equal(adopted.cache, 'HIT');
+  assert.equal(adopted.entry.at, refreshed.entry.at);
+  assert.equal(adopted.diagnostic, null);
+  assert.equal(
+    f.calls(),
+    2,
+    'peer must use the new disk receipt without redownloading',
+  );
+});
