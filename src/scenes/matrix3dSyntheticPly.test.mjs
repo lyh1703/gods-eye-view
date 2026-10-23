@@ -19,9 +19,9 @@ function fixture() {
   };
 }
 
-test('genuine PLY byte fixture checked and always synthetic', () => {
+test('genuine PLY byte fixture checked and always synthetic', async () => {
   const { data, meta } = fixture();
-  const value = inspectMatrix3dPly(data, meta);
+  const value = await inspectMatrix3dPly(data, meta);
   assert.equal(value.vertices, 1);
   assert.equal(value.local_ply_validated, true);
   assert.equal(value.scene_kind, 'synthetic');
@@ -32,13 +32,13 @@ test('genuine PLY byte fixture checked and always synthetic', () => {
   assert.equal(value.receiver_verified, false);
 });
 
-test('actual content tampering after audit is rejected', () => {
+test('actual content tampering after audit is rejected', async () => {
   const { data, meta } = fixture();
   data[data.length - 2] = '7'.charCodeAt(0);
-  assert.throws(() => inspectMatrix3dPly(data, meta), /checksum/);
+  await assert.rejects(() => inspectMatrix3dPly(data, meta), /checksum/);
 });
 
-test('GPS or observed claims cannot be laundered through Matrix source', () => {
+test('GPS or observed claims cannot be laundered through Matrix source', async () => {
   const { data, meta } = fixture();
   for (const changed of [
     { scene_kind: 'observed' },
@@ -46,11 +46,11 @@ test('GPS or observed claims cannot be laundered through Matrix source', () => {
     { source_commit: 'unverified' },
     { origin: 'Observed Satellite' },
   ]) {
-    assert.throws(() => inspectMatrix3dPly(data, { ...meta, ...changed }));
+    await assert.rejects(() => inspectMatrix3dPly(data, { ...meta, ...changed }));
   }
 });
 
-test('rejects malformed or runaway metadata and fabricated PLY', () => {
+test('rejects malformed or runaway metadata and fabricated PLY', async () => {
   const { data, meta } = fixture();
   for (const bad of [
     Buffer.from('not-a-ply-header', 'ascii'),
@@ -59,6 +59,6 @@ test('rejects malformed or runaway metadata and fabricated PLY', () => {
     Buffer.from('ply\nformat ascii 1.0\nelement vertex 0\nend_header\n0 0 0'),
   ]) {
     const newMeta = { ...meta, sha256: createHash('sha256').update(bad).digest('hex') };
-    assert.throws(() => inspectMatrix3dPly(bad, newMeta));
+    await assert.rejects(() => inspectMatrix3dPly(bad, newMeta));
   }
 });
