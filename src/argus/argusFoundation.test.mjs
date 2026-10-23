@@ -32,7 +32,6 @@ test('ARGUS observation envelope preserves observed and received time', () => {
   assert.equal(validateObservationEnvelope(observation).ok, true);
 });
 
-
 test('ARGUS rejects future source timestamps before freshness can be clamped to zero', () => {
   const valid = createObservationEnvelope({
     provider_id: 'test',
@@ -65,7 +64,11 @@ test('ARGUS rejects future source timestamps before freshness can be clamped to 
     () => createObservationEnvelope(future),
     /timestamp_observed must be at or before timestamp_received/,
   );
-  const sameInstant = { ...valid, timestamp_observed: valid.timestamp_received, freshness_seconds: 0 };
+  const sameInstant = {
+    ...valid,
+    timestamp_observed: valid.timestamp_received,
+    freshness_seconds: 0,
+  };
   assert.equal(validateObservationEnvelope(sameInstant).ok, true);
 });
 
