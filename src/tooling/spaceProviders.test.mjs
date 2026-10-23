@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { promises as fsp } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { createCelestrakClient } from '../../server/providers/space/celestrak-client.js';
 import {
   celestrakProxy,
   rocketLaunchesProxy,
@@ -75,23 +78,34 @@ test('compatibility exports retain the same LL2 header helper and TTL', () => {
 });
 
 test('exported CelesTrak plugin coalesces refreshes, retains stale TLEs, and reads disk in a new instance', async (t) => {
-  isolateDisk(t);
+  const cacheDir = await fsp.mkdtemp(
+    path.join(os.tmpdir(), 'gev-space-provider-'),
+  );
+  t.after(() => fsp.rm(cacheDir, { recursive: true, force: true }));
   let now = Date.now();
-  t.mock.method(Date, 'now', () => now);
   t.mock.method(console, 'warn', () => {});
-  const tle = 'ISS\n1 25544U fixture\n2 25544 fixture';
+  const tle = `ISS
+1 25544U 98067A   26274.10000000  .00016717  00000+0  30174-3 0  9998
+2 25544  51.6390 180.1234 0005000 200.0000 160.0000 15.50000000412345
+`;
   let calls = 0,
     release;
   const gate = new Promise((resolve) => {
     release = resolve;
   });
-  t.mock.method(globalThis, 'fetch', async (url) => {
+  let fetchImpl = async (url) => {
     calls++;
     assert.equal(new URL(url).searchParams.get('GROUP'), 'stations');
     await gate;
     return new Response(tle);
-  });
-  const request = install(celestrakProxy());
+  };
+  const makeClient = () =>
+    createCelestrakClient({
+      cacheDir,
+      now: () => now,
+      fetchImpl: (...args) => fetchImpl(...args),
+    });
+  const request = install(celestrakProxy({ client: makeClient() }));
   assert.equal((await request('/api/celestrak', '/../bad')).status, 400);
   assert.equal(calls, 0);
   const first = request('/api/celestrak', '/stations');
@@ -104,20 +118,28 @@ test('exported CelesTrak plugin coalesces refreshes, retains stale TLEs, and rea
     (await request('/api/celestrak', '/stations')).headers['x-tle-cache'],
     'HIT',
   );
+  const disk = await install(celestrakProxy({ client: makeClient() }))(
+    '/api/celestrak',
+    '/stations',
+  );
+  assert.equal(disk.headers['x-tle-cache'], 'HIT');
+  assert.equal(disk.body, tle);
+  assert.equal(calls, 1);
   now += 6 * 3600_000;
-  t.mock.method(globalThis, 'fetch', async () => new Response('not a TLE'));
+  fetchImpl = async () => {
+    calls++;
+    return new Response('not a TLE');
+  };
   const stale = await request('/api/celestrak', '/stations');
   assert.equal(stale.body, tle);
   assert.equal(stale.headers['x-tle-cache'], 'STALE-ERROR');
-  t.mock.method(fsp, 'readFile', async () =>
-    JSON.stringify({ at: now, body: tle }),
+  const restarted = await install(celestrakProxy({ client: makeClient() }))(
+    '/api/celestrak',
+    '/stations',
   );
-  t.mock.method(globalThis, 'fetch', async () => {
-    throw Error('fresh disk must prevent fetch');
-  });
-  const disk = await install(celestrakProxy())('/api/celestrak', '/stations');
-  assert.equal(disk.headers['x-tle-cache'], 'HIT');
-  assert.equal(disk.body, tle);
+  assert.equal(restarted.headers['x-tle-cache'], 'STALE-ERROR');
+  assert.equal(restarted.body, tle);
+  assert.equal(calls, 2, 'persisted cooldown prevents a restart download');
 });
 
 for (const preview of [false, true])
