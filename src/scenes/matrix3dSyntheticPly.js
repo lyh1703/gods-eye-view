@@ -7,10 +7,10 @@ export async function inspectMatrix3dPly(input, metadata) {
   if (!(input instanceof Uint8Array) || input.length < 30 || input.length > 64 * 1024 * 1024) {
     throw new Error('bounded nonempty PLY bytes required');
   }
-  const terminator = Buffer.from('end_header\n', 'ascii');
-  const end = Buffer.from(input).indexOf(terminator);
+  const prefix = new TextDecoder('ascii').decode(input.subarray(0, 16400));
+  const end = prefix.indexOf('end_header\n');
   if (end < 0 || end > 16384) throw new Error('invalid or unbounded PLY header');
-  const header = Buffer.from(input.subarray(0, end + terminator.length)).toString('ascii');
+  const header = prefix.slice(0, end + 'end_header\n'.length);
   if (!header.startsWith('ply\n')) throw new Error('PLY file signature missing');
   if (!/^format (ascii|binary_little_endian) 1\.0$/m.test(header)) {
     throw new Error('unsupported PLY encoding');
