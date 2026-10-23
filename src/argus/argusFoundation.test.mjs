@@ -32,6 +32,46 @@ test('ARGUS observation envelope preserves observed and received time', () => {
   assert.equal(validateObservationEnvelope(observation).ok, true);
 });
 
+test('ARGUS rejects future source timestamps before freshness can be clamped to zero', () => {
+  const valid = createObservationEnvelope({
+    provider_id: 'test',
+    entity_type: 'event',
+    entity_id: 'future-event',
+    observation_type: 'test-event',
+    timestamp_observed: '2026-09-24T00:00:00Z',
+    timestamp_received: '2026-09-24T00:00:10Z',
+    geometry: null,
+    properties: {},
+    source_url: 'https://example.test/future-event',
+    license_class: 'test',
+    commercial_allowed: false,
+    attribution_required: false,
+    retention_policy: 'test-only',
+    rate_limit_class: 'test',
+    ingestion_run_id: 'run-future',
+  });
+  const future = {
+    ...valid,
+    timestamp_observed: '2026-09-24T00:00:11Z',
+    freshness_seconds: 0,
+  };
+  assert.equal(validateObservationEnvelope(future).ok, false);
+  assert.match(
+    validateObservationEnvelope(future).errors.join('; '),
+    /timestamp_observed must be at or before timestamp_received/,
+  );
+  assert.throws(
+    () => createObservationEnvelope(future),
+    /timestamp_observed must be at or before timestamp_received/,
+  );
+  const sameInstant = {
+    ...valid,
+    timestamp_observed: valid.timestamp_received,
+    freshness_seconds: 0,
+  };
+  assert.equal(validateObservationEnvelope(sameInstant).ok, true);
+});
+
 test('G5 GeoJSON Point contract rejects out-of-range longitude and latitude', () => {
   const valid = createObservationEnvelope({
     provider_id: 'usgs-earthquakes-all-hour',
