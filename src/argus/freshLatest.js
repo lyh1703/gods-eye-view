@@ -23,10 +23,7 @@ export function validateFreshLatestOptions({
 }
 
 function zonedTime(value) {
-  if (
-    typeof value !== 'string' ||
-    !/(?:Z|[+-]\d{2}:\d{2})$/i.test(value)
-  )
+  if (typeof value !== 'string' || !/(?:Z|[+-]\d{2}:\d{2})$/i.test(value))
     return null;
   const milliseconds = Date.parse(value);
   return Number.isFinite(milliseconds) ? milliseconds : null;
@@ -87,8 +84,7 @@ export function selectFreshLatest(
     }
   }
   const ordered = [...latest.values()].sort(
-    (a, b) =>
-      b.observedMs - a.observedMs || a.key.localeCompare(b.key),
+    (a, b) => b.observedMs - a.observedMs || a.key.localeCompare(b.key),
   );
   return {
     as_of: new Date(clock).toISOString(),
