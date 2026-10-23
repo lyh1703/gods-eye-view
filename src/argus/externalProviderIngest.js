@@ -36,10 +36,13 @@ function errorSummary(error) {
     message: error?.message ?? String(error),
     code: error?.code ?? null,
     retryable: error?.retryable === true,
+    ...(error?.diagnostic ? { diagnostic: error.diagnostic } : {}),
   };
 }
 
 function isRetryableProviderError(error) {
+  // An explicit provider policy veto overrides generic timeout retries.
+  if (error?.retryable === false) return false;
   return (
     error?.retryable === true ||
     error?.name === 'AbortError' ||
@@ -65,7 +68,14 @@ export function classifyObservationFreshness(
   // currently fresh. Previously max(0, ...) disguised negative age as zero.
   // Preserve age_seconds=null when the time is invalid or lies in the future.
   const futureDated = ageSeconds != null && ageSeconds < 0;
-  const usableAge = futureDated ? null : ageSeconds;
+  const sourceAge = observation?.freshness_seconds;
+  const usableAge =
+    futureDated || ageSeconds == null
+      ? null
+      : Math.max(
+          ageSeconds,
+          Number.isFinite(sourceAge) && sourceAge >= 0 ? sourceAge : 0,
+        );
   return {
     age_seconds: usableAge,
     stale:

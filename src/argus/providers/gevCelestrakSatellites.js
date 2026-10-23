@@ -9,6 +9,10 @@ import {
 
 import { createObservationEnvelope } from '../observationEnvelope.js';
 import { createSatelliteSource } from '../../layers/satellites/source.js';
+import {
+  celestrakFailure,
+  celestrakError,
+} from '../../data/celestrakPolicy.js';
 
 export const GEV_CELESTRAK_SATELLITES_PROVIDER = Object.freeze({
   provider_id: 'gev-celestrak-satellites',
@@ -168,25 +172,54 @@ export function createGevCelestrakSatellitesAdapter({
       try {
         result = await source.readGroup(group);
       } catch (error) {
-        if (error?.name === 'AbortError') {
-          throw providerError('CelesTrak provider timeout', {
-            name: 'TimeoutError',
-            retryable: true,
-            code: 'TIMEOUT',
-          });
-        }
-        throw providerError('CelesTrak provider unavailable', {
-          retryable: true,
-          code: 'PROVIDER_UNAVAILABLE',
-        });
+        throw celestrakError(celestrakFailure(error));
       }
       if (!result.ok) {
-        throw providerError(`CelesTrak provider HTTP ${result.status}`, {
-          retryable:
-            result.status === 408 ||
-            result.status === 429 ||
-            result.status >= 500,
-          code: result.status === 429 ? 'RATE_LIMIT' : 'HTTP_FAILURE',
+        const diagnostic = celestrakFailure(
+          null,
+          Number(result.upstreamStatus) || result.status,
+        );
+        // Accept only known, bounded proxy classifications, never arbitrary headers.
+        if (
+          [
+            'TIMEOUT',
+            'ABORTED',
+            'DNS_FAILURE',
+            'TLS_FAILURE',
+            'CONNECT_TIMEOUT',
+            'CONNECTION_REFUSED',
+            'CONNECTION_RESET',
+            'NETWORK_FAILURE',
+            'MALFORMED_PAYLOAD',
+            'OVERSIZED_RESPONSE',
+            'CACHE_BUSY',
+            'CACHE_INTEGRITY_FAILURE',
+            'REQUEST_INTERRUPTED',
+            'INVALID_REQUEST_STATE',
+          ].includes(result.errorCode)
+        ) {
+          diagnostic.code = result.errorCode;
+          diagnostic.http_status = Number(result.upstreamStatus) || null;
+          diagnostic.name =
+            result.errorCode === 'TIMEOUT'
+              ? 'TimeoutError'
+              : result.errorCode === 'ABORTED'
+                ? 'AbortError'
+                : 'ProviderError';
+        }
+        diagnostic.requires_operator = result.requiresOperator;
+        throw celestrakError(diagnostic);
+      }
+
+      // A stale fallback is useful to the globe but cannot establish successful
+      // external ingestion or become a fresh observation in World Memory.
+      if (result.cache === 'STALE-ERROR') {
+        throw celestrakError({
+          name: 'ProviderError',
+          retryable: false,
+          code: 'STALE_CACHE',
+          http_status: Number(result.upstreamStatus) || null,
+          requires_operator: result.requiresOperator,
         });
       }
 
@@ -206,6 +239,20 @@ export function createGevCelestrakSatellitesAdapter({
       }
 
       const receivedAt = now();
+      if (
+        result.cache != null &&
+        (!result.fetchedAt ||
+          !Number.isFinite(Date.parse(result.fetchedAt)) ||
+          Date.parse(result.fetchedAt) > receivedAt.getTime() ||
+          receivedAt.getTime() - Date.parse(result.fetchedAt) >= 6 * 3600_000 ||
+          result.sourceUrl !==
+            `${GEV_CELESTRAK_SATELLITES_PROVIDER.source_url}?GROUP=${encodeURIComponent(group)}&FORMAT=tle` ||
+          !/^[a-f0-9]{64}$/.test(result.sha256 ?? ''))
+      ) {
+        throw providerError('CelesTrak cache provenance is invalid or stale', {
+          code: 'INVALID_CACHE_PROVENANCE',
+        });
+      }
       const observedMs = receivedAt.getTime();
       if (!timeContains(observedMs, time)) return [];
       const entityId =
@@ -251,6 +298,10 @@ export function createGevCelestrakSatellitesAdapter({
                 epochMs == null ? null : new Date(epochMs).toISOString(),
               tle_age_seconds: tleAgeSeconds,
               tle_stale: staleTle,
+              state_basis: 'propagated-orbital-elements',
+              source_cache_status: result.cache,
+              source_fetched_at: result.fetchedAt,
+              source_sha256: result.sha256,
             },
             coverage: GEV_CELESTRAK_SATELLITES_PROVIDER.coverage,
             confidence: staleTle ? 0.7 : 0.9,
