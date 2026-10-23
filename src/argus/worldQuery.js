@@ -1,4 +1,7 @@
-import { selectFreshLatest, validateFreshLatestOptions } from './freshLatest.js';
+import {
+  selectFreshLatest,
+  validateFreshLatestOptions,
+} from './freshLatest.js';
 import { createProviderRegistry } from './providerRegistry.js';
 import {
   compareWorldSnapshots,
