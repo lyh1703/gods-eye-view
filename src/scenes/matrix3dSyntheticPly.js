@@ -1,7 +1,7 @@
 /** Read-only Matrix-3D Gaussian-splat .ply intake contract for ARGUS.
  * This does not run model inference or render PLY; it validates genuine
  * exported PLY bytes so later loaders cannot treat a synthetic scene as
- * observed geolocation. Node-only processing, no external downloads.
+ * observed geolocation. Browser-compatible processing, no external downloads.
  */
 export async function inspectMatrix3dPly(input, metadata) {
   if (!(input instanceof Uint8Array) || input.length < 30 || input.length > 64 * 1024 * 1024) {
