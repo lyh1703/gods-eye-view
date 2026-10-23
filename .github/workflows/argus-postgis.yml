@@ -61,7 +61,6 @@ jobs:
 
     env:
       PGHOST: 127.0.0.1
-      PGPORT: ${{ job.services.postgis.ports[5432] }}
       PGUSER: argus
       PGPASSWORD: argus
       PGDATABASE: argus_test
@@ -84,6 +83,9 @@ jobs:
           actual_image="$(docker inspect --format '{{.Config.Image}}' "$cid")"
           test "$actual_image" = "postgis/postgis:16-3.4" || { echo "::error::unexpected PostGIS service image"; exit 1; }
           echo "ARGUS_POSTGIS_CID=$cid" >> "$GITHUB_ENV"
+          # The service port exists only inside a running job. GitHub rejects
+          # job.services in jobs.<job_id>.env before it can schedule the job.
+          echo "PGPORT=${{ job.services.postgis.ports[5432] }}" >> "$GITHUB_ENV"
           docker exec "$cid" psql --version
 
       - name: Apply migration on clean database
