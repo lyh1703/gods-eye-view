@@ -139,12 +139,15 @@ jobs:
             done
             ports+=("$port")
           done
-          # Both isolated DB containers stay alive together during their
-          # migrations; never choose a container by a published host port.
-          for cid in "${containers[@]}"; do
+          # The entrypoint's temporary init server accepts Unix sockets only.
+          # TCP readiness therefore waits until all PostGIS init scripts finish.
+          all_containers=("$ARGUS_POSTGIS_CID" "${containers[@]}")
+          for index in "${!all_containers[@]}"; do
+            cid="${all_containers[$index]}"
             ready=0
             for attempt in $(seq 1 60); do
-              if docker exec "$cid" pg_isready -U argus -d argus_test >/dev/null 2>&1; then
+              if docker exec "$cid" psql -h 127.0.0.1 -U argus -d argus_test \
+                -v ON_ERROR_STOP=1 -tAc 'SELECT postgis_full_version()' >/dev/null 2>&1; then
                 ready=1
                 break
               fi
@@ -154,15 +157,33 @@ jobs:
               echo "::error::MT74 private PostGIS container not ready"
               exit 1
             fi
-            docker exec -i "$cid" psql -U argus -d argus_test \
+            docker exec -i "$cid" psql -h 127.0.0.1 -U argus -d argus_test \
               -v ON_ERROR_STOP=1 < db/argus_world/001_world_memory.sql >/dev/null
+            docker exec -i "$cid" psql -h 127.0.0.1 -U argus -d argus_test \
+              -v ON_ERROR_STOP=1 < db/argus_world/001_world_memory_test.sql >/dev/null
             table_count="$(docker exec "$cid" psql -U argus -d argus_test \
               -v ON_ERROR_STOP=1 -tAc "SELECT count(*) FROM pg_tables WHERE schemaname='argus_world'")"
             [[ "$table_count" =~ ^[0-9]+$ ]]
-            test "$table_count" -gt 0
+            test "$table_count" -eq 13
+            echo "MT74_MIGRATION_PASS cid=$cid host_port=${ports[$index]} tables=$table_count geometry_time_provenance_supersession=pass"
+          done
+          for cid in "${all_containers[@]}"; do
             test "$(docker inspect -f '{{.State.Running}}' "$cid")" = true
+            echo "MT74_CONCURRENT_RUNNING cid=$cid"
+          done
+          # Restore the service's clean schema for the unchanged migration gates.
+          docker exec "$ARGUS_POSTGIS_CID" psql -U argus -d argus_test \
+            -v ON_ERROR_STOP=1 -c 'DROP SCHEMA argus_world CASCADE;' >/dev/null
+          for cid in "${containers[@]}"; do
+            docker rm -f "$cid" >/dev/null
+            if docker inspect "$cid" >/dev/null 2>&1; then
+              echo "::error::MT74 temporary container was not removed: $cid"
+              exit 1
+            fi
+            echo "MT74_TEMP_CONTAINER_REMOVED cid=$cid"
           done
           test "$(docker inspect -f '{{.State.Running}}' "$ARGUS_POSTGIS_CID")" = true
+          echo "MT74_SERVICE_PRESERVED cid=$ARGUS_POSTGIS_CID host_port=$PGPORT"
           echo "MT74_CONCURRENT_POSTGIS_PORT_AND_CONTAINER_ISOLATION_PASS"
 
       - name: Apply migration on clean database
