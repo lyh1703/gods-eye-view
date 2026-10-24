@@ -127,6 +127,10 @@ jobs:
         env:
           EXPECTED_SHA: ${{ needs.direct.outputs.commit_sha }}
         run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.14.0'
+          cache: npm
       - name: Run repository regression checks without model invocation
         shell: bash
         run: npm ci && npm test
