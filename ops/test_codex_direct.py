@@ -34,8 +34,27 @@ class RepositoryBoundaryTests(unittest.TestCase):
         with self.assertRaises(c.Blocked):
             c.parse_command(command("lyh1703/project-nexus"))
 
+    def test_optional_profile_backward_compatibility_and_live_change(self):
+        legacy = c.parse_command(command())
+        self.assertNotIn("profile", legacy)
+        for profile in ("AUTO", "FAST", "STANDARD", "DEEP", "CRITICAL"):
+            self.assertEqual(c.parse_command(c.PREFIX + json.dumps(dict(legacy, profile=profile.lower())))["profile"], profile)
+        for extra in ({"model": "arbitrary"}, {"profile": "unknown"}):
+            with self.assertRaises(c.Blocked):
+                c.parse_command(c.PREFIX + json.dumps(dict(legacy, **extra)))
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "meta.json"
+            path.write_text(json.dumps(dict(comment_id=123, **legacy, profile="FAST")))
+            live = dict(user=dict(login=c.OPERATOR, id=c.OPERATOR_ID),
+                body=c.PREFIX + json.dumps(dict(legacy, profile="CRITICAL")),
+                issue_url=f"https://api.github.com/repos/{c.REPO}/issues/{c.ISSUE}")
+            with patch.object(c, "comments", return_value=[]), patch.object(c, "api", side_effect=[event()["issue"], live]), patch.object(c, "receipt") as receipt:
+                with self.assertRaises(c.Blocked):
+                    c.claim(path, "fixture", "1")
+                receipt.assert_not_called()
+
     def test_control_credentials_and_traversal_are_not_model_editable(self):
-        for path in ("ops/codex_direct.py", ".github/workflows/test.yml", "docs/.secret",
+        for path in ("ops/codex_direct.py", "ops/codex_model_router.py", "ops/codex_router_policy.json", ".github/workflows/test.yml", "docs/.secret",
                      "docs/../secret", "/etc/passwd", "../docs/foo", "docs//foo"):
             with self.subTest(path=path), self.assertRaises(c.Blocked):
                 c.parse_command(command(path=path))
@@ -63,12 +82,12 @@ class RepositoryBoundaryTests(unittest.TestCase):
             issue = event()["issue"]
             live = dict(user=dict(login=c.OPERATOR, id=c.OPERATOR_ID), body=command(),
                 issue_url=f"https://api.github.com/repos/{c.REPO}/issues/{c.ISSUE}")
-            with patch.object(c, "api", side_effect=[dict(issue, state="closed"), live]), patch.object(c, "receipt") as receipt:
+            with patch.object(c, "comments", return_value=[]), patch.object(c, "api", side_effect=[dict(issue, state="closed"), live]), patch.object(c, "receipt") as receipt:
                 with self.assertRaises(c.Blocked):
                     c.claim(meta, "fixture", "1")
                 receipt.assert_not_called()
             live["body"] = command(path="docs/changed.md")
-            with patch.object(c, "api", side_effect=[issue, live]), self.assertRaises(c.Blocked):
+            with patch.object(c, "comments", return_value=[]), patch.object(c, "api", side_effect=[issue, live]), self.assertRaises(c.Blocked):
                 c.claim(meta, "fixture", "1")
 
     def test_prior_task_claim_cannot_consume_usage_again(self):

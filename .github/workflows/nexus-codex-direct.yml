@@ -36,6 +36,8 @@ jobs:
           state="$RUNNER_TEMP/direct-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
           mkdir -m 700 "$state"
           cp control/ops/codex_direct.py "$state/controller.py"
+          cp control/ops/codex_model_router.py "$state/codex_model_router.py"
+          cp control/ops/codex_router_policy.json "$state/codex_router_policy.json"
           echo "DIRECT_STATE=$state" >> "$GITHUB_ENV"
           test "$(id -un)" = yunho
           test "$HOME" = /home/yunho
@@ -50,6 +52,16 @@ jobs:
           ref: argus/main
           persist-credentials: false
           path: task
+      - name: Discover actual supported models without inference
+        shell: bash
+        run: |
+          env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 python3 "$DIRECT_STATE/codex_model_router.py" probe --cli "$HOME/.local/bin/codex" --output "$DIRECT_STATE/catalog.json"
+      - name: Select model from actual task and repository context
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 "$DIRECT_STATE/controller.py" route --workspace "$GITHUB_WORKSPACE/task" --meta "$DIRECT_STATE/meta.json" --catalog "$DIRECT_STATE/catalog.json" --route "$DIRECT_STATE/route.json"
       - name: Bind exact base and claim live authorization
         id: claim
         shell: bash
@@ -58,7 +70,7 @@ jobs:
         run: |
           set -euo pipefail
           git -C task rev-parse HEAD > "$DIRECT_STATE/base-sha"
-          python3 "$DIRECT_STATE/controller.py" claim --meta "$DIRECT_STATE/meta.json" --run-id "$GITHUB_RUN_ID"
+          python3 "$DIRECT_STATE/controller.py" claim --meta "$DIRECT_STATE/meta.json" --run-id "$GITHUB_RUN_ID" --route "$DIRECT_STATE/route.json"
       - name: Execute one bounded authenticated model under host lock
         shell: bash
         working-directory: task
@@ -68,16 +80,12 @@ jobs:
           # No GitHub or Actions runtime token is inherited by the model process.
           flock -w 120 /home/yunho/.cache/nexus-codex-direct.lock \
             env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 \
-            timeout 570s "$HOME/.local/bin/codex" exec --sandbox workspace-write --ephemeral --json - \
-            < "$DIRECT_STATE/prompt.txt" > "$DIRECT_STATE/model.jsonl" 2> "$DIRECT_STATE/model.stderr"
-          python3 - <<'PY'
-          import json, os
-          from pathlib import Path
-          rows = [json.loads(s) for s in (Path(os.environ['DIRECT_STATE']) / 'model.jsonl').read_text().splitlines()]
-          if not any(r.get('type') == 'turn.completed' for r in rows) or any(r.get('type') in {'turn.failed', 'error'} for r in rows):
-              raise SystemExit('Codex model execution not confirmed')
-          print('CODEX_MODEL_RUN=COMPLETED')
-          PY
+            python3 "$DIRECT_STATE/codex_model_router.py" execute \
+              --cli "$HOME/.local/bin/codex" --route "$DIRECT_STATE/route.json" \
+              --meta "$DIRECT_STATE/meta.json" --catalog "$DIRECT_STATE/catalog.json" \
+              --policy "$DIRECT_STATE/codex_router_policy.json" --prompt "$DIRECT_STATE/prompt.txt" \
+              --events "$DIRECT_STATE/model.jsonl" --stderr "$DIRECT_STATE/model.stderr" \
+              --result "$DIRECT_STATE/execution.json"
       - name: Independently inspect actual file scope with preserved controller
         shell: bash
         run: |
@@ -102,7 +110,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: python3 "$DIRECT_STATE/controller.py" finalize --meta "$DIRECT_STATE/meta.json" --result "$DIRECT_STATE/result.json" --run-id "$GITHUB_RUN_ID"
+        run: python3 "$DIRECT_STATE/controller.py" finalize --meta "$DIRECT_STATE/meta.json" --result "$DIRECT_STATE/result.json" --run-id "$GITHUB_RUN_ID" --route "$DIRECT_STATE/route.json" --execution "$DIRECT_STATE/execution.json"
       - name: Remove ephemeral model output and proposals
         if: always()
         shell: bash

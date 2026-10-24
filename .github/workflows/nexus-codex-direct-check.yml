@@ -1,7 +1,7 @@
 name: Codex direct installation and runtime check
 on:
   pull_request:
-    paths: ['ops/codex_direct.py', 'ops/test_codex_direct.py', '.github/workflows/nexus-codex-direct*.yml', 'docs/codex_direct_policy.json']
+    paths: ['ops/codex_direct.py', 'ops/test_codex_direct.py', 'ops/codex_model_router.py', 'ops/codex_router_policy.json', 'ops/test_codex_model_router.py', '.github/workflows/nexus-codex-direct*.yml', 'docs/codex_direct_policy.json']
 permissions:
   contents: read
 jobs:
@@ -17,10 +17,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m unittest discover -s ops -p test_codex_direct.py -v
+          python3 -m unittest discover -s ops -p 'test_codex*.py' -v
           test "$(id -un)" = yunho
           test "$HOME" = /home/yunho
           test -x "$HOME/.local/bin/codex"
           "$HOME/.local/bin/codex" login status >/dev/null 2>&1
           command -v flock >/dev/null
+          python3 ops/codex_model_router.py probe --cli "$HOME/.local/bin/codex" --output "$RUNNER_TEMP/router_capabilities.json" --policy ops/codex_router_policy.json
           echo 'CODEX_CLI_AUTH_AND_REPOSITORY_BOUNDARIES=PASS; MODEL_NOT_INVOKED'
