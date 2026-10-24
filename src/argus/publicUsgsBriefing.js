@@ -92,7 +92,9 @@ export function renderPublicUsgsBriefing(result) {
   const lines = [
     'USGS 최근 1시간 공개 지진 관측',
     '조회 종료 시각(UTC): ' + windowEnd,
-    '관측 결과: ' + items.length + '건 (최대 25건 조회; 전체 지진 발생 수 아님)',
+    '관측 결과: ' +
+      items.length +
+      '건 (최대 25건 조회; 전체 지진 발생 수 아님)',
   ];
   if (items.length === 0) {
     lines.push(
