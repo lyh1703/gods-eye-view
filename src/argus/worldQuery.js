@@ -1,3 +1,7 @@
+import {
+  selectFreshLatest,
+  validateFreshLatestOptions,
+} from './freshLatest.js';
 import { createProviderRegistry } from './providerRegistry.js';
 import {
   compareWorldSnapshots,
@@ -122,6 +126,35 @@ export function createWorldQueryEngine({
         .flatMap((result) => result.observations)
         .slice(0, normalizeLimit(options.limit)),
     };
+  }
+
+  async function latest({
+    provider_ids,
+    scope = null,
+    time = null,
+    filters = {},
+    limit = 100,
+    stale_after_seconds = 900,
+    ingestion_run_id,
+  } = {}) {
+    const options = validateFreshLatestOptions({
+      limit,
+      staleAfterSeconds: stale_after_seconds,
+    });
+    // Query enough candidates to deduplicate multiple versions of an entity.
+    // This is a bounded adapter read, not a guarantee of exhaustive coverage.
+    const providerResults = await runProviders({
+      provider_ids,
+      scope,
+      time,
+      filters,
+      limit: Math.min(1000, Math.max(100, options.limit * 4)),
+      ingestion_run_id,
+    });
+    return selectFreshLatest(providerResults, {
+      asOf: now().toISOString(),
+      ...options,
+    });
   }
 
   async function entity({
@@ -255,6 +288,7 @@ export function createWorldQueryEngine({
 
   return Object.freeze({
     query,
+    latest,
     entity,
     nearby,
     compare,
