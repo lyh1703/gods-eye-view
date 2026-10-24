@@ -1,0 +1,26 @@
+name: Codex direct installation and runtime check
+on:
+  pull_request:
+    paths: ['ops/codex_direct.py', 'ops/test_codex_direct.py', '.github/workflows/nexus-codex-direct*.yml', 'docs/codex_direct_policy.json']
+permissions:
+  contents: read
+jobs:
+  check:
+    if: github.repository == 'lyh1703/gods-eye-view' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.id == 220658595
+    runs-on: [self-hosted, linux, x64, maker-team]
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check controller boundaries without model usage
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s ops -p test_codex_direct.py -v
+          test "$(id -un)" = yunho
+          test "$HOME" = /home/yunho
+          test -x "$HOME/.local/bin/codex"
+          "$HOME/.local/bin/codex" login status >/dev/null 2>&1
+          command -v flock >/dev/null
+          echo 'CODEX_CLI_AUTH_AND_REPOSITORY_BOUNDARIES=PASS; MODEL_NOT_INVOKED'

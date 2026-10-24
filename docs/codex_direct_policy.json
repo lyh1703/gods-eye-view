@@ -1,0 +1,16 @@
+{
+  "source_repository": "lyh1703/project-nexus",
+  "source_path": "nexus_v0/codex_direct.py",
+  "source_sha256": "b3ebd4b4afde542fdc8cd7b21ae5171a99b0ef197c2f79d2dc7d8028ec16281f",
+  "repository": "lyh1703/gods-eye-view",
+  "inbox": 38,
+  "inbox_is_pr": true,
+  "base_ref": "argus/main",
+  "allowed_directories": [
+    "docs/",
+    "src/argus/",
+    "scripts/"
+  ],
+  "installed": false,
+  "live_e2e_verified": false
+}
