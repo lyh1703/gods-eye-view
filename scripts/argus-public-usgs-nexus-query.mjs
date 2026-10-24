@@ -1,4 +1,8 @@
-import { createExternalProviderIngestor, createInMemoryWorldMemoryRepository, createNexusVerifiedQueryAdapter, createUsgsEarthquakesAdapter, createWorldMemoryQueryEngine, USGS_EARTHQUAKES_PROVIDER } from '../src/argus/index.js';
+import { createExternalProviderIngestor } from '../src/argus/externalProviderIngest.js';
+import { createInMemoryWorldMemoryRepository } from '../src/argus/memory/repository.js';
+import { createNexusVerifiedQueryAdapter } from '../src/argus/nexusVerifiedQuery.js';
+import { createUsgsEarthquakesAdapter, USGS_EARTHQUAKES_PROVIDER } from '../src/argus/providers/usgsEarthquakes.js';
+import { createWorldMemoryQueryEngine } from '../src/argus/memory/worldMemoryQuery.js';
 
 export async function runPublicUsgsNexusQuery({ fetchImpl = fetch, now = () => new Date(), limit = 10 } = {}) {
   if (!Number.isInteger(limit) || limit < 1 || limit > 25) throw new RangeError('limit 1..25 required');
