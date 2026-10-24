@@ -111,6 +111,15 @@ export function createExternalProviderIngestor({
     const providerId = adapter.metadata.provider_id;
     const runId = uuid();
     const startedAt = now().toISOString();
+    // Wall-clock corrections (including WSL/NTP steps) can move time backwards
+    // during a live provider fetch. Preserve the persisted run-order invariant
+    // without weakening Postgres validation or rewriting observation times.
+    const completionTime = () => {
+      const candidate = now().toISOString();
+      return Date.parse(candidate) < Date.parse(startedAt)
+        ? startedAt
+        : candidate;
+    };
     const baseRun = {
       ingestion_run_id: runId,
       provider_id: providerId,
@@ -155,7 +164,7 @@ export function createExternalProviderIngestor({
         }
       }
     } catch (error) {
-      const completedAt = now().toISOString();
+      const completedAt = completionTime();
       await memory.saveIngestionRun({
         ...baseRun,
         status: 'FAILED',
@@ -203,7 +212,7 @@ export function createExternalProviderIngestor({
       await memory.saveIngestionRun({
         ...baseRun,
         status: 'FAILED',
-        completed_at: now().toISOString(),
+        completed_at: completionTime(),
         records_seen: observations.length,
         records_accepted: 0,
         records_rejected: observations.length,
@@ -306,7 +315,7 @@ export function createExternalProviderIngestor({
       const persisted = await memory.appendObservations(accepted, {
         recorded_at: now().toISOString(),
       });
-      const completedAt = now().toISOString();
+      const completedAt = completionTime();
       const freshness = observations.map((observation) =>
         classifyObservationFreshness(observation, {
           now: completedAt,
@@ -362,7 +371,7 @@ export function createExternalProviderIngestor({
         await memory.saveIngestionRun({
           ...baseRun,
           status: 'FAILED',
-          completed_at: now().toISOString(),
+          completed_at: completionTime(),
           records_seen: observations.length,
           records_accepted: 0,
           records_rejected: observations.length,

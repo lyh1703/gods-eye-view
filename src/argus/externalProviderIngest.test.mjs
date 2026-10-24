@@ -313,3 +313,56 @@ test('DB write failure is surfaced after fetch/normalize', async () => {
   });
   await assert.rejects(() => ingestor.ingest(adapter), /database write failure/);
 });
+
+test('backward wall-clock step preserves completed >= started on successful ingest', async () => {
+  id = 0;
+  const started = new Date('2026-09-23T08:53:30.000Z');
+  const regressed = new Date('2026-09-23T08:53:29.000Z');
+  let ticks = 0;
+  const repository = createInMemoryWorldMemoryRepository({ now: () => started });
+  const adapter = createUsgsEarthquakesAdapter({
+    fetchImpl: async () => response(feed()),
+    now: () => started,
+  });
+  const ingestor = createExternalProviderIngestor({
+    repository,
+    now: () => (++ticks === 1 ? started : regressed),
+    uuid,
+    staleAfterSeconds: 3600,
+  });
+
+  const result = await ingestor.ingest(adapter);
+  assert.equal(result.status, 'OK');
+  assert.equal(result.inserted, 1);
+  const stored = await repository.getIngestionRun(result.ingestion_run_id);
+  assert.equal(stored.started_at, started.toISOString());
+  assert.equal(stored.completed_at, started.toISOString());
+  assert.equal(stored.status, 'SUCCEEDED');
+});
+
+test('backward wall-clock step preserves FAILED run evidence without false time inversion', async () => {
+  id = 0;
+  const started = new Date('2026-09-23T08:53:30.000Z');
+  const regressed = new Date('2026-09-23T08:53:29.000Z');
+  let ticks = 0;
+  const repository = createInMemoryWorldMemoryRepository({ now: () => started });
+  const adapter = createUsgsEarthquakesAdapter({
+    fetchImpl: async () => response({}, { ok: false, status: 401 }),
+    now: () => started,
+  });
+  const ingestor = createExternalProviderIngestor({
+    repository,
+    now: () => (++ticks === 1 ? started : regressed),
+    uuid,
+    maxAttempts: 1,
+  });
+
+  const result = await ingestor.ingest(adapter);
+  assert.equal(result.status, 'DEGRADED');
+  assert.equal(result.inserted, 0);
+  const stored = await repository.getIngestionRun(result.ingestion_run_id);
+  assert.equal(stored.started_at, started.toISOString());
+  assert.equal(stored.completed_at, started.toISOString());
+  assert.equal(stored.status, 'FAILED');
+  assert.equal(repository.observationCount(), 0);
+});
