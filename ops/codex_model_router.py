@@ -130,9 +130,10 @@ def discover_models(cli, timeout=60):
             if not isinstance(result.get("data"), list):
                 raise RouterBlocked("CLI_CATALOG_INVALID")
             for model in result["data"]:
-                if (not isinstance(model, dict) or model.get("hidden") is True
-                        or model.get("availabilityNux") is not None):
+                if not isinstance(model, dict) or model.get("hidden") is True:
                     continue
+                # availabilityNux is informational first-use copy, not an access veto.
+                # Official model/list entries and supported efforts are the capability evidence.
                 name = model.get("model")
                 efforts = model.get("supportedReasoningEfforts")
                 if not isinstance(name, str) or not MODEL_RE.fullmatch(name) or not isinstance(efforts, list):
@@ -269,6 +270,10 @@ def github_context(meta, api_get=None):
     local = meta["repository"]
     known = {"lyh1703/" + n for n in ("project-nexus", "project-atlas", "gods-eye-view", "project-metron")}
     repos = {local}
+    for alias, name in (("NEXUS", "project-nexus"), ("ARGUS", "gods-eye-view"),
+                        ("ATLAS", "project-atlas"), ("METRON", "project-metron")):
+        if re.search(r"\b" + alias + r"\b", instruction, re.I):
+            repos.add("lyh1703/" + name)
     for repo in known:
         if repo in instruction:
             repos.add(repo)
@@ -475,6 +480,8 @@ def execute(cli, route_path, meta_path, catalog_path, policy_path, prompt, event
         actual = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, timeout=10, check=True).stdout.strip()
         if actual != route["base_sha"]:
             raise RouterBlocked("WORKSPACE_BASE_CHANGED")
+    if "base_sha" in route and source_facts(Path.cwd(), meta["allowed_paths"]) != route["facts"]:
+        raise RouterBlocked("APPROVED_SOURCE_CHANGED_AFTER_ROUTING")
     argv = codex_argv(cli, route)
     started = time.monotonic()
     timed_out, cancelled = False, False
@@ -533,6 +540,7 @@ def main(argv=None):
     try:
         if args.command == "probe":
             result = discover_models(args.cli)
+            print("ROUTER_CAPABILITIES=" + json.dumps(result, sort_keys=True))
             if args.policy:
                 policy = load_policy(args.policy)
                 available = {m["model"]: set(m["reasoning_efforts"]) for m in result["models"]}
@@ -542,7 +550,6 @@ def main(argv=None):
                         raise RouterBlocked("CONFIGURED_PROFILE_UNSUPPORTED")
                 print("ROUTER_ALL_CONFIGURED_PROFILES=SUPPORTED")
             save_json(args.output, result)
-            print("ROUTER_CAPABILITIES=" + json.dumps(result, sort_keys=True))
         elif args.command == "execute":
             return 0 if execute(args.cli, args.route, args.meta, args.catalog, args.policy,
                                 args.prompt, args.events, args.stderr, args.result) else 2

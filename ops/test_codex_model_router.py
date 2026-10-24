@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import shutil
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -110,6 +111,14 @@ class RouterSelectionTests(unittest.TestCase):
         self.assertEqual(route["repository"], REPO)
         self.assertEqual(calls, [])
         self.assertEqual(command["allowed_paths"], ["nexus_v0/feature.py"])
+
+    def test_named_projects_mark_coordination_without_cross_repository_reads(self):
+        command = meta(instruction="Coordinate the NEXUS interface with ARGUS and ATLAS modules.")
+        calls = []
+        ctx = r.github_context(command, lambda endpoint: calls.append(endpoint))
+        self.assertEqual(decide(self.root, command, ctx)["profile"], "DEEP")
+        self.assertEqual(len(ctx["coordinated_repositories"]), 3)
+        self.assertEqual(calls, [])
 
     def test_explicit_profile_overrides_inference_without_changing_paths(self):
         command = meta(["docs/guide.md"], profile="DEEP")
@@ -224,7 +233,7 @@ class FakeCLIContracts(unittest.TestCase):
 
     def fake(self, failed=False, observation=True, repeated_cursor=False):
         data = catalog()
-        models = [dict(model=m["model"], id="ui-" + m["model"], displayName=m["model"], hidden=False,
+        models = [dict(model=m["model"], id="ui-" + m["model"], displayName=m["model"], hidden=False, availabilityNux={"message": "Try this supported model"},
                        supportedReasoningEfforts=[dict(reasoningEffort=x) for x in m["reasoning_efforts"]]) for m in data["models"]]
         script = '''#!/usr/bin/env python3
 import json,os,sys
@@ -255,7 +264,13 @@ print(json.dumps({'type':'turn.completed','usage':{'input_tokens':23,'cached_inp
 '''
         script = script.replace("COUNTER", repr(str(self.counter))).replace("MODELS", repr(models))
         script = script.replace("REPEAT", repr(repeated_cursor)).replace("FAILED", repr(failed)).replace("OBSERVATION", repr(observation))
-        self.cli.write_text(script)
+        # setup-python builds can require LD_LIBRARY_PATH; the model environment
+        # intentionally omits it. Use the OS Python for this independent fixture.
+        interpreter = shutil.which("python3", path="/usr/bin:/bin")
+        if interpreter is None:
+            self.skipTest("System Python unavailable for clean-environment fixture")
+        script = script.replace("#!/usr/bin/env python3", "#!" + interpreter, 1)
+        self.cli.write_text(script, encoding="utf-8")
         self.cli.chmod(0o700)
 
     def setup_run(self):
