@@ -1,0 +1,56 @@
+name: ARGUS Public USGS to NEXUS Contract Live
+on:
+  pull_request:
+    paths:
+      - 'scripts/argus-public-usgs-nexus-*.mjs'
+      - 'src/argus/argusPublicUsgsNexusQuery.test.mjs'
+      - '.github/workflows/argus-public-usgs-nexus-live.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  public-provider-to-consumer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.14.0'
+      - name: Real public provider through ARGUS and NEXUS JSON subprocess
+        run: |
+          node --input-type=module <<'NODE'
+          import { spawnSync } from 'node:child_process';
+          const request = {
+            operation: 'query',
+            provider_ids: ['usgs-earthquakes-all-hour'],
+            type: 'earthquake',
+            limit: 10,
+          };
+          const run = spawnSync(process.execPath,
+            ['scripts/argus-public-usgs-nexus-cli.mjs'], {
+              input: JSON.stringify(request), encoding: 'utf8',
+              timeout: 30000, maxBuffer: 2 * 1024 * 1024,
+            });
+          if (run.status !== 0) throw new Error('PUBLIC_USGS_PROVIDER_OR_SUBPROCESS_HOLD');
+          const result = JSON.parse(run.stdout);
+          if (result.contract_id !== 'argus-nexus-verified-query-v0.1' ||
+              result.operation !== 'query' || result.verified !== true ||
+              result.health.degraded !== false ||
+              result.health.partial_failure !== false ||
+              result.health.ingestion_runs[0]?.status !== 'SUCCEEDED') {
+            throw new Error('PUBLIC_NEXUS_CONTRACT_OR_PROVIDER_HEALTH_HOLD');
+          }
+          const observations = result.data.observations;
+          if (!Array.isArray(observations) || observations.length < 1 ||
+              result.evidence.observation_ids.length < 1 ||
+              result.evidence.ingestion_run_ids.length < 1 ||
+              result.evidence.source_urls.length < 1) {
+            throw new Error('PUBLIC_PROVIDER_NO_FRESH_OBSERVATION_HOLD');
+          }
+          console.log('ARGUS_PUBLIC_USGS_TO_NEXUS_SUBPROCESS_REAL_PROVIDER_PASS');
+          console.log('Fresh public events: ' + observations.length);
+          console.log('No DB, private account, provider write or paid API');
+          NODE
