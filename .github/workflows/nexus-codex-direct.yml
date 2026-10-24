@@ -1,0 +1,132 @@
+name: Repository-local NEXUS Codex direct
+on:
+  issue_comment:
+    types: [created]
+permissions: {}
+concurrency:
+  group: codex-direct-lyh1703/gods-eye-view
+  cancel-in-progress: false
+jobs:
+  direct:
+    if: >-
+      github.repository == 'lyh1703/gods-eye-view' &&
+      github.event.issue.number == 38 &&
+      github.event.comment.user.login == 'lyh1703' &&
+      github.event.comment.user.id == 220658595 &&
+      startsWith(github.event.comment.body, 'NEXUS-CODEX-DIRECT TASK ')
+    runs-on: [self-hosted, linux, x64, maker-team]
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    outputs:
+      commit_sha: ${{ steps.publish.outputs.commit_sha }}
+    steps:
+      - name: Checkout trusted default-branch controller
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+          path: control
+      - name: Preserve trusted controller and check runtime before claim
+        shell: bash
+        run: |
+          set -euo pipefail
+          state="$RUNNER_TEMP/direct-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          mkdir -m 700 "$state"
+          cp control/ops/codex_direct.py "$state/controller.py"
+          echo "DIRECT_STATE=$state" >> "$GITHUB_ENV"
+          test "$(id -un)" = yunho
+          test "$HOME" = /home/yunho
+          test -x "$HOME/.local/bin/codex"
+          "$HOME/.local/bin/codex" login status >/dev/null 2>&1
+          command -v flock >/dev/null
+          mkdir -p "$HOME/.cache"
+          python3 "$state/controller.py" prepare --event "$GITHUB_EVENT_PATH" --meta "$state/meta.json" --prompt "$state/prompt.txt"
+      - name: Checkout repository's actual development base
+        uses: actions/checkout@v4
+        with:
+          ref: argus/main
+          persist-credentials: false
+          path: task
+      - name: Bind exact base and claim live authorization
+        id: claim
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git -C task rev-parse HEAD > "$DIRECT_STATE/base-sha"
+          python3 "$DIRECT_STATE/controller.py" claim --meta "$DIRECT_STATE/meta.json" --run-id "$GITHUB_RUN_ID"
+      - name: Execute one bounded authenticated model under host lock
+        shell: bash
+        working-directory: task
+        run: |
+          set -euo pipefail
+          # Shared across repository-specific runner services for this authenticated UID.
+          # No GitHub or Actions runtime token is inherited by the model process.
+          flock -w 120 /home/yunho/.cache/nexus-codex-direct.lock \
+            env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 \
+            timeout 570s "$HOME/.local/bin/codex" exec --sandbox workspace-write --ephemeral --json - \
+            < "$DIRECT_STATE/prompt.txt" > "$DIRECT_STATE/model.jsonl" 2> "$DIRECT_STATE/model.stderr"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          rows = [json.loads(s) for s in (Path(os.environ['DIRECT_STATE']) / 'model.jsonl').read_text().splitlines()]
+          if not any(r.get('type') == 'turn.completed' for r in rows) or any(r.get('type') in {'turn.failed', 'error'} for r in rows):
+              raise SystemExit('Codex model execution not confirmed')
+          print('CODEX_MODEL_RUN=COMPLETED')
+          PY
+      - name: Independently inspect actual file scope with preserved controller
+        shell: bash
+        run: |
+          python3 "$DIRECT_STATE/controller.py" inspect --workspace "$GITHUB_WORKSPACE/task" --meta "$DIRECT_STATE/meta.json" --proposal "$DIRECT_STATE/proposal.json"
+      - name: Publish using only this repository's Actions token
+        id: publish
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          python3 "$DIRECT_STATE/controller.py" publish --meta "$DIRECT_STATE/meta.json" --proposal "$DIRECT_STATE/proposal.json" --checkout-sha "$(cat "$DIRECT_STATE/base-sha")" --result "$DIRECT_STATE/result.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          result = json.loads((Path(os.environ['DIRECT_STATE']) / 'result.json').read_text())
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+              out.write('commit_sha=' + result['commit_sha'] + '\n')
+          PY
+      - name: Return execution receipt independently of PR policy
+        if: always() && steps.claim.outcome == 'success'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 "$DIRECT_STATE/controller.py" finalize --meta "$DIRECT_STATE/meta.json" --result "$DIRECT_STATE/result.json" --run-id "$GITHUB_RUN_ID"
+      - name: Remove ephemeral model output and proposals
+        if: always()
+        shell: bash
+        run: |
+          if [[ "${DIRECT_STATE:-}" == "$RUNNER_TEMP/direct-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" ]]; then
+            rm -rf -- "$DIRECT_STATE"
+          fi
+  verify:
+    needs: direct
+    if: needs.direct.outputs.commit_sha != ''
+    permissions:
+      contents: read
+    runs-on: [self-hosted, linux, x64, maker-team]
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.direct.outputs.commit_sha }}
+          persist-credentials: false
+      - name: Verify immutable commit identity
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ needs.direct.outputs.commit_sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - name: Run repository regression checks without model invocation
+        shell: bash
+        run: npm ci && npm test
