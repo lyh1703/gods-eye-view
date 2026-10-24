@@ -1,0 +1,46 @@
+name: ARGUS USGS Readable Briefing Live
+on:
+  pull_request:
+    paths:
+      - 'scripts/argus-public-usgs-briefing-cli.mjs'
+      - 'src/argus/publicUsgsBriefing.js'
+      - 'src/argus/publicUsgsBriefing.test.mjs'
+      - '.github/workflows/argus-usgs-readable-briefing-live.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  public-briefing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.14.0'
+      - name: Actual ARGUS -> World Memory -> NEXUS contract tests
+        run: node --test src/argus/publicUsgsBriefing.test.mjs
+      - name: Real official public USGS to readable user result
+        run: |
+          node scripts/argus-public-usgs-briefing-cli.mjs > /tmp/argus-briefing.txt
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const text = readFileSync('/tmp/argus-briefing.txt', 'utf8');
+          if (!text.includes('USGS 최근 1시간 공개 지진 관측') ||
+              !text.includes('조회 종료 시각(UTC): ') ||
+              !text.includes('관측 결과: ')) {
+            throw new Error('ARGUS_BRIEFING_NOT_USER_READABLE');
+          }
+          const count = text.match(/관측 결과: (\d+)건/);
+          if (!count) throw new Error('ARGUS_BRIEFING_MISSING_COUNT');
+          if (Number(count[1]) > 0 &&
+              !text.includes('출처: https://earthquake.usgs.gov/')) {
+            throw new Error('ARGUS_BRIEFING_MISSING_PUBLIC_PROVENANCE');
+          }
+          if (Number(count[1]) === 0 &&
+              !text.includes('지진이 없었다는 뜻은 아닙니다')) {
+            throw new Error('ARGUS_BRIEFING_EMPTY_FEED_MISREPRESENTED');
+          }
+          console.log('ARGUS_REAL_PUBLIC_USGS_USER_BRIEFING_PASS');
+          console.log('Observed public events in bounded output: ' + count[1]);
+          NODE
