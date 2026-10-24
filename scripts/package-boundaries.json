@@ -84,6 +84,8 @@
     "modules": [
       "server/providers/space.js",
       "server/providers/space/celestrak.js",
+      "server/providers/space/celestrak-client.js",
+      "src/data/celestrakPolicy.js",
       "server/providers/space/launch-library.js",
       "server/providers/common/http.js",
       "src/data/spaceProviderRequests.js",

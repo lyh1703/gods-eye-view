@@ -36,10 +36,13 @@ function errorSummary(error) {
     message: error?.message ?? String(error),
     code: error?.code ?? null,
     retryable: error?.retryable === true,
+    ...(error?.diagnostic ? { diagnostic: error.diagnostic } : {}),
   };
 }
 
 function isRetryableProviderError(error) {
+  // An explicit provider policy veto overrides generic timeout retries.
+  if (error?.retryable === false) return false;
   return (
     error?.retryable === true ||
     error?.name === 'AbortError' ||
@@ -59,15 +62,26 @@ export function classifyObservationFreshness(
   const nowMs = now instanceof Date ? now.getTime() : new Date(now).getTime();
   const ageSeconds =
     Number.isFinite(observed) && Number.isFinite(nowMs)
-      ? Math.max(0, (nowMs - observed) / 1000)
+      ? (nowMs - observed) / 1000
       : null;
-
+  // A future-dated source observation cannot establish that a feed is
+  // currently fresh. Previously max(0, ...) disguised negative age as zero.
+  // Preserve age_seconds=null when the time is invalid or lies in the future.
+  const futureDated = ageSeconds != null && ageSeconds < 0;
+  const sourceAge = observation?.freshness_seconds;
+  const usableAge =
+    futureDated || ageSeconds == null
+      ? null
+      : Math.max(
+          ageSeconds,
+          Number.isFinite(sourceAge) && sourceAge >= 0 ? sourceAge : 0,
+        );
   return {
-    age_seconds: ageSeconds,
+    age_seconds: usableAge,
     stale:
-      ageSeconds == null
+      usableAge == null
         ? true
-        : ageSeconds > Math.max(0, Number(staleAfterSeconds) || 0),
+        : usableAge > Math.max(0, Number(staleAfterSeconds) || 0),
   };
 }
 

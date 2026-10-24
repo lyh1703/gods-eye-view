@@ -2,9 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { celestrakProxy } from '../server/providers/space/celestrak.js';
 import { readResponseTextCapped, coalesceProxyRequest } from './sources/httpBody.js';
 
-const source = ['local.js', 'common/http.js', 'aircraft/enrichment.js', 'terrain.js', 'space/celestrak.js', 'space/launch-library.js', '../../src/data/spaceProviderRequests.js']
+const source = ['local.js', 'common/http.js', 'aircraft/enrichment.js', 'terrain.js', 'space/launch-library.js', '../../src/data/spaceProviderRequests.js']
   .map(file => readFileSync(new URL(`../server/providers/${file}`, import.meta.url), 'utf8'))
   .join('\n');
 const detail = 'fixture-secret-token /internal/example <html>';
@@ -107,36 +108,22 @@ test('Launch Library retains single-flight, fresh cache, stale fallback, and met
   assert.equal(calls, 2);
 });
 
-test('CelesTrak unexpected failures hide details', async () => {
-  const app = fixture('celestrakProxy', { Date: { now() { throw new Error(detail); } } });
-  const res = await app.request('/active');
-  assert.equal(res.status, 500);
-  assert.equal(res.body, 'celestrak proxy error');
-  assert.equal(res.headers['x-tle-cache'], 'ERROR');
-});
-
-test('CelesTrak retains invalid-group and unavailable responses', async () => {
-  const app = fixture('celestrakProxy');
-  assert.equal((await app.request('/../')).status, 400);
-  const res = await app.request('/active');
-  assert.equal(res.status, 502);
-  assert.equal(res.headers['x-tle-cache'], 'NONE');
-});
-
-test('CelesTrak retains fresh and stale TLE caches', async () => {
-  let now = Date.now();
-  let calls = 0;
-  const app = fixture('celestrakProxy', {
-    Date: { now: () => now },
-    fetch: async () => { if (++calls > 1) throw new Error(detail); return new Response('1 valid-fixture-TLE'); },
-  });
-  assert.equal((await app.request('/active')).headers['x-tle-cache'], 'MISS');
-  assert.equal((await app.request('/active')).headers['x-tle-cache'], 'HIT');
-  now += 7 * 3600_000;
-  const stale = await app.request('/active');
-  assert.equal(stale.status, 200);
-  assert.equal(stale.body, '1 valid-fixture-TLE');
-  assert.equal(stale.headers['x-tle-cache'], 'STALE-ERROR');
+test('CelesTrak middleware hides unexpected internal errors in development and preview', async () => {
+  for (const preview of [false, true]) {
+    let middleware;
+    const client = { async readGroup() { throw new Error(detail); } };
+    const plugin = celestrakProxy({ client });
+    plugin[preview ? 'configurePreviewServer' : 'configureServer']({ middlewares: { use(_route, handler) { middleware = handler; } } });
+    const response = { writeHead(status, headers) { Object.assign(this, { status, headers }); }, end(body) { this.body = body; } };
+    await middleware({ url: '/active', method: 'GET' }, response);
+    assert.equal(response.status, 500);
+    assert.equal(response.body, 'celestrak proxy error');
+    assert.equal(response.headers['x-tle-cache'], 'ERROR');
+    await middleware({ url: '/../', method: 'GET' }, response);
+    assert.equal(response.status, 400);
+    await middleware({ url: '/stations', method: 'POST' }, response);
+    assert.equal(response.status, 405);
+  }
 });
 
 test('terrain unexpected failures hide details', async () => {

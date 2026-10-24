@@ -6,7 +6,10 @@ import { createPostgresWorldMemoryRepository } from './memory/postgresRepository
 import { createWorldMemoryQueryEngine } from './memory/worldMemoryQuery.js';
 import { createNexusVerifiedQueryAdapter } from './nexusVerifiedQuery.js';
 import { createGevCelestrakSatellitesAdapter } from './providers/gevCelestrakSatellites.js';
-import { celestrakTleUrl } from '../data/spaceProviderRequests.js';
+import {
+  createCelestrakClient,
+  celestrakResponse,
+} from '../../server/providers/space/celestrak-client.js';
 
 const url = process.env.ARGUS_POSTGRES_TEST_URL;
 
@@ -23,25 +26,19 @@ if (!url) {
     const pool = new Pool({ connectionString: url });
     try {
       const repository = createPostgresWorldMemoryRepository({ db: pool });
+      const client = createCelestrakClient({
+        ...(process.env.ARGUS_CELESTRAK_CACHE_DIR
+          ? { cacheDir: process.env.ARGUS_CELESTRAK_CACHE_DIR }
+          : {}),
+      });
+      let evidence;
       const adapter = createGevCelestrakSatellitesAdapter({
-        fetchImpl: async (input, init = {}) => {
-          const path = String(input);
-          const prefix = '/api/celestrak/';
-          if (!path.startsWith(prefix)) {
-            throw new Error(`unexpected CelesTrak test URL: ${path}`);
-          }
-          const group = path.slice(prefix.length).split('?')[0];
-          const upstream = celestrakTleUrl(group);
-          const signals = [AbortSignal.timeout(20_000)];
-          if (init.signal) signals.push(init.signal);
-          return fetch(upstream, {
-            ...init,
-            signal: AbortSignal.any(signals),
-            headers: {
-              'User-Agent':
-                'argus-capability-recovery-e2e/1.0 (+https://github.com/lyh1703/gods-eye-view)',
-            },
-          });
+        fetchImpl: async (input) => {
+          assert.equal(String(input), '/api/celestrak/stations');
+          evidence = await client.readGroup('stations');
+          // The real-provider gate must fail on a stale fallback or unavailable
+          // feed. No fixtures, alternate hosts, or second download on failure.
+          return celestrakResponse(evidence);
         },
       });
 
@@ -54,7 +51,30 @@ if (!url) {
         filters: { group: 'stations' },
         limit: 100,
       });
-      assert.notEqual(ingest.status, 'DEGRADED');
+      assert.notEqual(
+        ingest.status,
+        'DEGRADED',
+        JSON.stringify({
+          error: ingest.error,
+          cache: evidence?.cache,
+          diagnostic: evidence?.diagnostic,
+        }),
+      );
+      assert.ok(['MISS', 'HIT'].includes(evidence.cache));
+      assert.equal(evidence.diagnostic, null);
+      console.info(
+        'CelesTrak public evidence',
+        JSON.stringify({
+          transport:
+            evidence.cache === 'MISS'
+              ? 'UPSTREAM_RECEIVED'
+              : 'VERIFIED_FRESH_CACHE',
+          fetched_at: new Date(evidence.entry.at).toISOString(),
+          source_url: evidence.entry.source_url,
+          sha256: evidence.entry.sha256,
+          runtime: process.versions.node,
+        }),
+      );
       assert.ok(ingest.inserted + ingest.duplicates > 0);
 
       const observations = await repository.queryObservations({
@@ -64,7 +84,10 @@ if (!url) {
         limit: 100,
       });
       assert.ok(observations.length > 0);
-      const sample = observations[0];
+      const sample = observations.find(
+        (item) => item.ingestion_run_id === ingest.ingestion_run_id,
+      );
+      assert.ok(sample, 'public gate must read back this real ingestion run');
       assert.ok(sample.entity_id);
       assert.ok(sample.geometry);
       assert.ok(sample.source_url.includes('celestrak.org'));
@@ -99,8 +122,15 @@ if (!url) {
           (entry) => entry.observation.entity_id === sample.entity_id,
         ),
       );
-      assert.equal(nearby.health.requested_providers[0].state === 'OK' || nearby.health.requested_providers[0].state === 'STALE', true);
-      assert.notEqual(nearby.health.requested_providers[0].state, 'PROVIDER_FAILURE');
+      assert.equal(
+        nearby.health.requested_providers[0].state === 'OK' ||
+          nearby.health.requested_providers[0].state === 'STALE',
+        true,
+      );
+      assert.notEqual(
+        nearby.health.requested_providers[0].state,
+        'PROVIDER_FAILURE',
+      );
     } finally {
       await pool.end();
     }

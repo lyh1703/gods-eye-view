@@ -19,7 +19,20 @@ export function createSatelliteSource({
       const response = await fetchImpl(`/api/celestrak/${group}`, { signal });
       const text = response.ok ? await response.text() : '';
       signal?.throwIfAborted();
-      return { ok: response.ok, status: response.status, text };
+      return {
+        ok: response.ok,
+        status: response.status,
+        text,
+        cache: response.headers?.get('x-tle-cache') ?? null,
+        fetchedAt: response.headers?.get('x-tle-fetched-at') ?? null,
+        sourceUrl: response.headers?.get('x-tle-source') ?? null,
+        sha256: response.headers?.get('x-tle-sha256') ?? null,
+        errorCode: response.headers?.get('x-celestrak-error') ?? null,
+        upstreamStatus:
+          response.headers?.get('x-celestrak-http-status') ?? null,
+        requiresOperator:
+          response.headers?.get('x-celestrak-operator-required') === 'true',
+      };
     },
   };
 }

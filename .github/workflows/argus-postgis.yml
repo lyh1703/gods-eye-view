@@ -7,6 +7,10 @@ on:
       - 'db/argus_world/**'
       - 'src/argus/memory/**'
       - 'src/argus/providers/**'
+      - 'src/argus/celestrak*'
+      - 'server/providers/space/celestrak*'
+      - 'src/data/celestrakPolicy.js'
+      - 'src/layers/satellites/source*'
       - 'src/argus/externalProviderIngest*'
       - 'src/argus/nexusVerifiedQuery*'
       - 'src/argus/multiSourceFusion*'
@@ -19,6 +23,10 @@ on:
       - 'db/argus_world/**'
       - 'src/argus/memory/**'
       - 'src/argus/providers/**'
+      - 'src/argus/celestrak*'
+      - 'server/providers/space/celestrak*'
+      - 'src/data/celestrakPolicy.js'
+      - 'src/layers/satellites/source*'
       - 'src/argus/externalProviderIngest*'
       - 'src/argus/nexusVerifiedQuery*'
       - 'src/argus/multiSourceFusion*'
@@ -61,7 +69,6 @@ jobs:
 
     env:
       PGHOST: 127.0.0.1
-      PGPORT: ${{ job.services.postgis.ports[5432] }}
       PGUSER: argus
       PGPASSWORD: argus
       PGDATABASE: argus_test
@@ -84,6 +91,9 @@ jobs:
           actual_image="$(docker inspect --format '{{.Config.Image}}' "$cid")"
           test "$actual_image" = "postgis/postgis:16-3.4" || { echo "::error::unexpected PostGIS service image"; exit 1; }
           echo "ARGUS_POSTGIS_CID=$cid" >> "$GITHUB_ENV"
+          # The service port exists only inside a running job. GitHub rejects
+          # job.services in jobs.<job_id>.env before it can schedule the job.
+          echo "PGPORT=${{ job.services.postgis.ports[5432] }}" >> "$GITHUB_ENV"
           docker exec "$cid" psql --version
 
       - name: Apply migration on clean database
@@ -133,7 +143,12 @@ jobs:
         run: npm ci
 
       - name: Install pinned PostgreSQL test driver
-        run: npm install --no-save --package-lock=false pg@8.16.3
+        shell: bash
+        run: |
+          set -euo pipefail
+          driver="$RUNNER_TEMP/argus-pg-driver"
+          npm install --prefix "$driver" --no-save --package-lock=false pg@8.16.3
+          ln -s "$driver/node_modules/pg" node_modules/pg
 
       - name: Run Postgres repository contract suite
         env:
@@ -181,10 +196,20 @@ jobs:
           ARGUS_POSTGRES_TEST_URL: postgresql://argus:argus@127.0.0.1:${{ job.services.postgis.ports[5432] }}/argus_test
         run: node --test src/layers/earthquakes/worldMemorySource.postgres.test.mjs
 
+      - name: Run offline CelesTrak cache and provider policy contracts
+        run: node --test src/argus/celestrakReliability.test.mjs
+
+      - name: Run offline CelesTrak PostGIS reconnect and NEXUS contract
+        env:
+          ARGUS_POSTGRES_TEST_URL: postgresql://argus:argus@127.0.0.1:${{ job.services.postgis.ports[5432] }}/argus_test
+        run: node --test src/argus/celestrakPersistence.postgres.test.mjs
+
       - name: Run public CelesTrak to PostGIS NEXUS E2E gate
         if: matrix.node-version == '26'
         env:
           ARGUS_POSTGRES_TEST_URL: postgresql://argus:argus@127.0.0.1:${{ job.services.postgis.ports[5432] }}/argus_test
+          ARGUS_CELESTRAK_CACHE_DIR: ${{ runner.tool_cache }}/argus-celestrak-policy-v1
+          NODE_USE_ENV_PROXY: '1'
         run: node --test src/argus/celestrakPublic.postgres.test.mjs
 
       - name: Run ARGUS to NEXUS verified-query E2E gate

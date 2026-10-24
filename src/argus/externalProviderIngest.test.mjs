@@ -17,7 +17,7 @@ function response(payload, { ok = true, status = 200 } = {}) {
   return { ok, status, json: async () => structuredClone(payload) };
 }
 
-function feed({ mag = 4.2, updated = 1_790_153_610_000 } = {}) {
+function feed({ mag = 4.2, updated = 1_790_153_610_000, observed = 1_790_153_600_000 } = {}) {
   return {
     type: 'FeatureCollection',
     metadata: { generated: updated },
@@ -29,7 +29,7 @@ function feed({ mag = 4.2, updated = 1_790_153_610_000 } = {}) {
         properties: {
           mag,
           place: 'ARGUS E2E fixture',
-          time: 1_790_153_600_000,
+          time: observed,
           updated,
           status: 'reviewed',
           tsunami: 0,
@@ -214,6 +214,64 @@ test('freshness classifier marks old observations stale', () => {
   );
   assert.equal(freshness.stale, true);
   assert.equal(freshness.age_seconds, 3210);
+});
+
+test('future-dated or invalid source time is never classified as fresh', () => {
+  const clock = new Date('2026-10-17T00:00:00.000Z');
+  for (const value of [
+    '2026-10-17T00:00:01.000Z',
+    '2026-10-18T00:00:00.000Z',
+    'not-an-ISO-time',
+  ]) {
+    const result = classifyObservationFreshness(
+      { timestamp_observed: value },
+      { now: clock, staleAfterSeconds: 900 },
+    );
+    assert.equal(result.stale, true);
+    assert.equal(result.age_seconds, null);
+  }
+  const current = classifyObservationFreshness(
+    { timestamp_observed: '2026-10-17T00:00:00.000Z' },
+    { now: clock, staleAfterSeconds: 900 },
+  );
+  assert.equal(current.stale, false);
+  assert.equal(current.age_seconds, 0);
+});
+
+test('provider future observation cannot produce successful fresh ingest status', async () => {
+  id = 0;
+  const clock = new Date('2026-09-23T08:53:30.000Z');
+  const repository = createInMemoryWorldMemoryRepository({ now: () => clock });
+  const adapter = createUsgsEarthquakesAdapter({
+    fetchImpl: async () => response(feed()),
+    now: () => clock,
+  });
+  const ingestor = createExternalProviderIngestor({
+    repository,
+    now: () => new Date('2026-09-23T08:53:10.000Z'),
+    uuid,
+    staleAfterSeconds: 900,
+  });
+  const result = await ingestor.ingest(adapter);
+  assert.notEqual(result.status, 'OK');
+  assert.equal(result.status, 'STALE');
+  assert.equal(result.stale_count, 1);
+});
+
+
+test('USGS future source observation cannot persist as a fresh zero-age record', async () => {
+  id = 0;
+  const clock = new Date('2026-09-23T08:53:30.000Z');
+  const repository = createInMemoryWorldMemoryRepository({ now: () => clock });
+  const adapter = createUsgsEarthquakesAdapter({
+    fetchImpl: async () => response(feed({ observed: Date.parse('2026-09-23T08:54:30.000Z') })),
+    now: () => clock,
+  });
+  const ingestor = createExternalProviderIngestor({ repository, now: () => clock, uuid });
+  const result = await ingestor.ingest(adapter);
+  assert.equal(result.status, 'DEGRADED');
+  assert.match(result.error.message, /timestamp_observed must be at or before timestamp_received/);
+  assert.equal(repository.observationCount(), 0);
 });
 
 test('malformed USGS payload is degraded rather than silently accepted', async () => {
