@@ -65,3 +65,46 @@ test('untrusted, future, stale and invalid observed times never render', () => {
     assert.throws(() => renderPublicUsgsBriefing(result([item(bad)])));
   }
 });
+
+
+test('actual ARGUS ingest -> World Memory -> NEXUS contract renders a briefing', async () => {
+  const { runPublicUsgsNexusQuery } = await import('../../scripts/argus-public-usgs-nexus-query.mjs');
+  const verified = await runPublicUsgsNexusQuery({
+    now: () => new Date(end),
+    fetchImpl: async () => ({
+      ok: true, status: 200,
+      async json() {
+        return {
+          type: 'FeatureCollection',
+          features: [{
+            type: 'Feature', id: 'real-path-fixture',
+            geometry: { type: 'Point', coordinates: [127.1, 37.6, 8] },
+            properties: {
+              time: Date.parse('2026-10-25T01:34:00Z'),
+              mag: 3.2, place: 'verified path fixture',
+              status: 'reviewed', tsunami: 0, sig: 50,
+              url: 'https://earthquake.usgs.gov/earthquakes/eventpage/real-path-fixture',
+            },
+          }],
+        };
+      },
+    }),
+  });
+  const briefing = renderPublicUsgsBriefing(verified);
+  assert.match(briefing, /M3\.2 \| verified path fixture/);
+  assert.match(briefing, /earthquake\.usgs\.gov\/earthquakes\/eventpage\/real-path-fixture/);
+});
+
+test('actual ARGUS empty source -> NEXUS contract renders no-data warning', async () => {
+  const { runPublicUsgsNexusQuery } = await import('../../scripts/argus-public-usgs-nexus-query.mjs');
+  const verified = await runPublicUsgsNexusQuery({
+    now: () => new Date(end),
+    fetchImpl: async () => ({
+      ok: true, status: 200,
+      async json() { return { type: 'FeatureCollection', features: [] }; },
+    }),
+  });
+  const briefing = renderPublicUsgsBriefing(verified);
+  assert.match(briefing, /관측 결과: 0건/);
+  assert.match(briefing, /지진이 없었다는 뜻은 아닙니다/);
+});
