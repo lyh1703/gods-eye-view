@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "version": "2026-10-25-v1",
+  "repositories": ["lyh1703/project-nexus", "lyh1703/project-atlas", "lyh1703/gods-eye-view", "lyh1703/project-metron"],
+  "timeout_seconds": 570,
+  "max_attempts": 1,
+  "capability_evidence": {
+    "cli_version": "codex-cli 0.164.0",
+    "source": "codex app-server model/list",
+    "workflow_run": "https://github.com/lyh1703/project-nexus/actions/runs/40113209263",
+    "inference_calls": 0
+  },
+  "profiles": {
+    "FAST": {"enabled": true, "model": "gpt-6-luna", "effort": "low", "extra_efforts": []},
+    "STANDARD": {"enabled": true, "model": "gpt-6.1-sol", "effort": "medium", "extra_efforts": []},
+    "DEEP": {"enabled": true, "model": "gpt-6.1-sol", "effort": "high", "extra_efforts": []},
+    "CRITICAL": {"enabled": true, "model": "gpt-6-astra", "effort": "high", "extra_efforts": ["xhigh"]}
+  }
+}

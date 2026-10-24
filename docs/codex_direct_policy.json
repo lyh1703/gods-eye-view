@@ -1,7 +1,7 @@
 {
   "source_repository": "lyh1703/project-nexus",
   "source_path": "nexus_v0/codex_direct.py",
-  "source_sha256": "b3ebd4b4afde542fdc8cd7b21ae5171a99b0ef197c2f79d2dc7d8028ec16281f",
+  "source_sha256": "ed3845a143b8557bee7d5431b26da5e7f935914d6bc305239719b88af20d6d8e",
   "repository": "lyh1703/gods-eye-view",
   "inbox": 38,
   "inbox_is_pr": true,
@@ -12,5 +12,7 @@
     "scripts/"
   ],
   "installed": false,
-  "live_e2e_verified": false
+  "live_e2e_verified": false,
+  "router_module_sha256": "759962808b45513fad155d4aa8cb46d698388cec166b994a7a87fc2a9ae07299",
+  "router_policy_sha256": "29392533a7ed25c49c0a2004395aee119ff5617839b1b88134c4d504c675359f"
 }
