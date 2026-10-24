@@ -61,7 +61,6 @@ jobs:
 
     env:
       PGHOST: 127.0.0.1
-      PGPORT: ${{ job.services.postgis.ports[5432] }}
       PGUSER: argus
       PGPASSWORD: argus
       PGDATABASE: argus_test
@@ -76,6 +75,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          echo "PGPORT=${{ job.services.postgis.ports[5432] }}" >> "$GITHUB_ENV"
           cid="${{ job.services.postgis.id }}"
           if [ -z "$cid" ] || ! docker inspect "$cid" >/dev/null 2>&1; then
             echo "::error::ARGUS PostGIS service container identity is missing"
