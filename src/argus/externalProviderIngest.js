@@ -116,7 +116,9 @@ export function createExternalProviderIngestor({
     // without weakening Postgres validation or rewriting observation times.
     const completionTime = () => {
       const candidate = now().toISOString();
-      return Date.parse(candidate) < Date.parse(startedAt) ? startedAt : candidate;
+      return Date.parse(candidate) < Date.parse(startedAt)
+        ? startedAt
+        : candidate;
     };
     const baseRun = {
       ingestion_run_id: runId,
