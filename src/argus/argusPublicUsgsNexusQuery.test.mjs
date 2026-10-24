@@ -29,7 +29,6 @@ test('public USGS -> ephemeral World Memory -> official NEXUS verified query', a
       return feed([
         quake('fresh', '2026-10-24T07:34:00Z'),
         quake('stale', '2026-10-24T06:00:00Z'),
-        quake('future', '2026-10-24T07:36:00Z'),
       ]);
     },
   });
@@ -40,6 +39,10 @@ test('public USGS -> ephemeral World Memory -> official NEXUS verified query', a
   assert.equal(result.data.mode, 'history');
   assert.deepEqual(result.data.observations.map(x => x.entity_id), ['fresh']);
   assert.equal(result.data.count, 1);
+  assert.equal(result.data.observations[0].source_url, 'https://earthquake.usgs.gov/earthquakes/eventpage/fresh');
+  assert.equal(result.data.observations[0].timestamp_observed, '2026-10-24T07:34:00.000Z');
+  assert.equal(result.data.observations[0].timestamp_received, CLOCK.toISOString());
+  assert.equal(result.data.observations[0].freshness_seconds, 60);
   assert.equal(result.evidence.observation_ids.length, 1);
   assert.equal(result.evidence.ingestion_run_ids.length, 1);
   assert.equal(result.health.ingestion_runs[0].status, 'SUCCEEDED');
@@ -74,3 +77,18 @@ test('query result size remains bounded before network request', async () => {
   }), /limit 1..25/);
   assert.equal(calls, 0);
 });
+
+for (const [name, features] of [
+  ['future-only', [quake('future', '2026-10-24T07:36:00Z')]],
+  ['mixed fresh+future', [
+    quake('fresh', '2026-10-24T07:34:00Z'),
+    quake('future', '2026-10-24T07:36:00Z'),
+  ]],
+]) {
+  test(`${name} batch fails closed without a verified query result`, async () => {
+    await assert.rejects(() => runPublicUsgsNexusQuery({
+      now: () => CLOCK,
+      fetchImpl: async () => feed(features),
+    }), /^Error: USGS_UNAVAILABLE$/);
+  });
+}
