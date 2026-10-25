@@ -7,20 +7,22 @@ import { test } from 'node:test';
 import {
   directionsUrl,
   findSavedPlace,
-  loadPlaces,
   manualPlace,
   mapsSearchUrl,
-  savePlaces,
 } from './personalPlaces.js';
+import {
+  loadPlaces,
+  savePlaces,
+} from '../../scripts/personal-places-storage.mjs';
 
-test('public Maps search links are only generated (no network)', () => {
+test('Maps search links contain only user-supplied query data', () => {
   const link = new URL(mapsSearchUrl('인천 송도 맛집'));
   assert.equal(link.hostname, 'www.google.com');
   assert.equal(link.searchParams.get('query'), '인천 송도 맛집');
   assert.equal(link.searchParams.get('api'), '1');
 });
 
-test('routes come from manually entered place names and do not claim driving time', () => {
+test('user-authored route link has no invented travel metrics', () => {
   const places = [
     { name: 'Restaurant A', area: 'Seoul' },
     { name: 'Park B', area: 'Incheon' },
@@ -34,23 +36,23 @@ test('routes come from manually entered place names and do not claim driving tim
   assert.equal(link.searchParams.has('duration'), false);
 });
 
-test('reject empty query, invalid travel mode, and ungrounded route size', () => {
+test('reject invalid query, travel mode, route size', () => {
   assert.throws(() => mapsSearchUrl('  '));
   assert.throws(() => directionsUrl([{ name: 'A', area: 'X' }]));
-  assert.throws(() =>
-    directionsUrl(
-      [{ name: 'A', area: 'X' }, { name: 'B', area: 'Y' }],
-      'airplane',
-    ),
-  );
+  const places = [{ name: 'A', area: 'X' }, { name: 'B', area: 'Y' }];
+  assert.throws(() => directionsUrl(places, 'airplane'));
 });
 
-test('private local-only file stores only user-typed notes', async () => {
+test('local-only persistence stores user-typed notes', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'personal-places-test-'));
   try {
     const file = path.join(root, 'places.json');
     assert.deepEqual(await loadPlaces(file), []);
-    const a = manualPlace({ name: 'Owned Favorite', area: 'Incheon', note: 'my note' });
+    const a = manualPlace({
+      name: 'Owned Favorite',
+      area: 'Incheon',
+      note: 'my note',
+    });
     await savePlaces([a], file);
     const readback = await loadPlaces(file);
     assert.equal(readback[0].source, 'USER_TYPED_ONLY');
@@ -65,8 +67,13 @@ test('private local-only file stores only user-typed notes', async () => {
   }
 });
 
-test('personal shortlist refuses out-of-bounds or unlabeled imported data', () => {
+test('reject out-of-bounds manual data', () => {
   assert.throws(() => manualPlace({ name: '', area: 'Seoul' }));
   assert.throws(() => manualPlace({ name: 'Place', area: '' }));
-  assert.throws(() => manualPlace({ name: 'Place', area: 'Seoul', note: 'x'.repeat(1001) }));
+  const excessive = 'x'.repeat(1001);
+  assert.throws(() => manualPlace({
+    name: 'Place',
+    area: 'Seoul',
+    note: excessive,
+  }));
 });
