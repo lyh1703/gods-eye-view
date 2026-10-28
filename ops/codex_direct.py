@@ -33,6 +33,9 @@ ALLOWED_DIRS = ('docs/', 'src/argus/', 'scripts/')
 DENIED = frozenset(("ops/codex_direct.py", "ops/test_codex_direct.py", "ops/codex_model_router.py", "ops/codex_router_policy.json", "ops/test_codex_model_router.py"))
 MAX_FILES = 8
 MAX_BYTES = 40000
+# Local owner-command size bounds; these are not model context limits.
+MAX_INSTRUCTION_CHARS = 8000
+MAX_COMMAND_UTF8_BYTES = 12000
 
 
 class Blocked(Exception):
@@ -52,8 +55,13 @@ def valid_path(value):
 
 
 def parse_command(body):
-    if not isinstance(body, str) or len(body) > 3100 or not body.startswith(PREFIX):
+    if not isinstance(body, str) or not body.startswith(PREFIX):
         raise Blocked("unsupported command")
+    try:
+        if len(body.encode("utf-8")) > MAX_COMMAND_UTF8_BYTES:
+            raise Blocked("unsupported command")
+    except UnicodeError:
+        raise Blocked("unsupported command") from None
     try:
         data = json.loads(body[len(PREFIX):])
     except (TypeError, ValueError):
@@ -64,8 +72,12 @@ def parse_command(body):
     key, repo, instruction, paths = (data[x] for x in ("key", "repository", "instruction", "allowed_paths"))
     if not isinstance(key, str) or not KEY_RE.fullmatch(key) or repo != REPO:
         raise Blocked("task key or repository invalid")
-    if not isinstance(instruction, str) or not 10 <= len(instruction) <= 1900 or "\x00" in instruction:
+    if not isinstance(instruction, str) or not 10 <= len(instruction) <= MAX_INSTRUCTION_CHARS or "\x00" in instruction:
         raise Blocked("instruction invalid")
+    try:
+        instruction.encode("utf-8")
+    except UnicodeError:
+        raise Blocked("instruction invalid") from None
     if not isinstance(paths, list) or not 1 <= len(paths) <= MAX_FILES:
         raise Blocked("invalid paths")
     paths = [valid_path(p) for p in paths]
@@ -109,13 +121,19 @@ def api(method, endpoint, token, payload=None):
 
 
 def comments(token):
+    # Bound each response below the 250-KiB GitHub API response budget even
+    # when commands are larger. Never truncate history or lose replay receipts.
+    page_size = 12
+    max_comments = 500
     result = []
-    for page in range(1, 6):
-        data = api("GET", f"/issues/{ISSUE}/comments?per_page=100&page={page}", token)
-        if not isinstance(data, list):
+    for page in range(1, max_comments // page_size + 2):
+        data = api("GET", f"/issues/{ISSUE}/comments?per_page={page_size}&page={page}", token)
+        if not isinstance(data, list) or len(data) > page_size:
             raise Blocked("invalid issue comments response")
         result.extend(data)
-        if len(data) < 100:
+        if len(result) > max_comments:
+            raise Blocked("comment history exceeds safety bound")
+        if len(data) < page_size:
             return result
     raise Blocked("comment history exceeds safety bound")
 
