@@ -101,5 +101,62 @@ class RepositoryBoundaryTests(unittest.TestCase):
                 c.claim(meta, "fixture", "2")
 
 
+    def test_long_bounded_instruction_and_profile(self):
+        base = c.parse_command(command())
+        text = "Review strictly allowed files. "
+        long_instruction = text + ("A" * (8000 - len(text)))
+        self.assertEqual(len(long_instruction), 8000)
+        body = c.PREFIX + json.dumps({
+            **base, "instruction": long_instruction, "profile": "DEEP",
+        })
+        parsed = c.parse_command(body)
+        self.assertEqual(parsed["instruction"], long_instruction)
+        self.assertEqual(parsed["profile"], "DEEP")
+        self.assertEqual(parsed["allowed_paths"], base["allowed_paths"])
+
+    def test_long_command_utf8_and_invalid_unicode_rejected(self):
+        base = c.parse_command(command())
+        with self.assertRaisesRegex(c.Blocked, "^instruction invalid$"):
+            c.parse_command(c.PREFIX + json.dumps({
+                **base, "instruction": "A" * 8001,
+            }))
+        # Character count alone is insufficient: enforce a byte bound.
+        multilingual = c.PREFIX + json.dumps({
+            **base, "instruction": "가" * 4000,
+        }, ensure_ascii=False)
+        self.assertGreater(len(multilingual.encode("utf-8")), 12000)
+        with self.assertRaisesRegex(c.Blocked, "^unsupported command$"):
+            c.parse_command(multilingual)
+        # Escaped lone surrogate decoded from JSON must not enter prompt files.
+        invalid = c.PREFIX + json.dumps({
+            **base, "instruction": chr(0xD800) * 10,
+        })
+        with self.assertRaisesRegex(c.Blocked, "^instruction invalid$"):
+            c.parse_command(invalid)
+
+    def test_comment_history_small_pages_and_fail_closed_replay_boundary(self):
+        receipts = [{"id": i, "body": f"DIRECT-CODEX RECEIPT STARTED comment={i} task=X run=1"}
+                    for i in range(35)]
+        called = []
+        def fake_api(method, endpoint, token):
+            self.assertEqual(method, "GET")
+            self.assertIn("per_page=12", endpoint)
+            page = int(endpoint.rsplit("page=", 1)[1])
+            called.append(page)
+            return receipts[(page - 1) * 12:page * 12]
+        with patch.object(c, "api", side_effect=fake_api):
+            observed = c.comments("synthetic-token")
+        self.assertEqual(observed, receipts)
+        self.assertEqual(called, [1, 2, 3])
+
+        def endless_api(method, endpoint, token):
+            page = int(endpoint.rsplit("page=", 1)[1])
+            return [{"id": (page - 1) * 12 + i} for i in range(12)]
+        with patch.object(c, "api", side_effect=endless_api):
+            with self.assertRaisesRegex(c.Blocked, "comment history exceeds safety bound"):
+                c.comments("synthetic-token")
+
+
+
 if __name__ == "__main__":
     unittest.main()
