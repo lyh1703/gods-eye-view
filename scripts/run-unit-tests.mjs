@@ -60,6 +60,14 @@ export function allocationTestArgs(file) {
   return ['--expose-gc', '--test', '--test-concurrency=1', file];
 }
 
+/** Bound cross-file pressure without weakening launcher or ingestion assertions. */
+export function parallelTestArgs(files, concurrency = 2) {
+  if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 8) {
+    throw new RangeError('Unit-test concurrency must be an integer from 1 to 8');
+  }
+  return ['--test', `--test-concurrency=${concurrency}`, ...files];
+}
+
 function runTests(args) {
   const result = spawnSync(process.execPath, args, {
     cwd: process.cwd(),
@@ -72,7 +80,7 @@ function runTests(args) {
 
 export function runUnitTests() {
   const plan = buildUnitTestPlan(discoverUnitTestFiles());
-  const parallelStatus = runTests(['--test', ...plan.parallel]);
+  const parallelStatus = runTests(parallelTestArgs(plan.parallel));
   if (parallelStatus !== 0) return parallelStatus;
 
   // The GC-bracketed budgets are calibrated on Node 24 and are meaningless on
