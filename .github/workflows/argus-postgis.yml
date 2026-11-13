@@ -45,7 +45,8 @@ concurrency:
 jobs:
   migration:
     name: Clean PostGIS migration
-    runs-on: [self-hosted, linux, x64, maker-team]
+    # Public-repo GitHub-hosted Linux with isolated PostGIS service.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     strategy:
       fail-fast: false

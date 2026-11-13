@@ -15,7 +15,8 @@ concurrency:
 jobs:
   verify:
     name: Node ${{ matrix.node }}
-    runs-on: [self-hosted, linux, x64, maker-team]
+    # Standard hosted runner: no local Maker Team Linux dependency.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -90,7 +91,8 @@ jobs:
 
   windows-onboarding:
     name: Windows onboarding
-    runs-on: [self-hosted, windows, x64, maker-team]
+    # Standard hosted runner: onboard against ephemeral Windows CI machine.
+    runs-on: windows-2022
     timeout-minutes: 20
     env:
       PUPPETEER_SKIP_DOWNLOAD: '1'
