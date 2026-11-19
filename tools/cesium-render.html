@@ -218,9 +218,10 @@
           const h = viewer.scene.sampleHeight(c);
           if (h !== undefined && !isNaN(h)) { groundHeight = h; break; }
         }
-        if (groundHeight === undefined) {
-          console.warn('sampleHeight failed, using 150m fallback');
-          groundHeight = 150;
+        // A guessed elevation can place the camera inside terrain and produce
+        // a plausible-looking but invalid screenshot. Fail closed instead.
+        if (groundHeight === undefined || !Number.isFinite(groundHeight)) {
+          throw new Error('Ground elevation unavailable: Cesium render not verified');
         }
         window.__groundHeight = groundHeight;
         console.log('Ground: ' + groundHeight.toFixed(1) + 'm  Camera: ' + (groundHeight + height).toFixed(1) + 'm');
