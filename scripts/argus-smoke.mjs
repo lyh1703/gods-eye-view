@@ -35,6 +35,19 @@ export async function runArgusSmoke({
     );
   }
 
+  // A valid envelope alone does not prove that the response belongs to this
+  // provider or this ingestion run. Never accept cross-run observations.
+  const mismatched = result.observations.filter(
+    (observation) =>
+      observation.provider_id !== provider.provider_id ||
+      observation.ingestion_run_id !== ingestionRunId,
+  );
+  if (mismatched.length > 0) {
+    throw new Error(
+      `ARGUS smoke received ${mismatched.length} observation(s) with mismatched provenance`,
+    );
+  }
+
   return {
     provider_id: provider.provider_id,
     provider_ok: provider.ok,
