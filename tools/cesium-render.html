@@ -205,7 +205,9 @@
           destination: Cesium.Cartesian3.fromDegrees(targetLon, targetLat, 500),
           orientation: { heading: 0, pitch: Cesium.Math.toRadians(-90), roll: 0 },
         });
-        await waitStable(1000, 15000);
+        if (!await waitStable(1000, 15000)) {
+          throw new Error('Overhead tiles did not stabilize: ground elevation not verified');
+        }
 
         // Sample ground height at the TARGET position
         let groundHeight;
@@ -245,6 +247,9 @@
           // Give lower SSE levels more time — they need more tiles
           const maxWait = s <= 2 ? 90000 : s <= 4 ? 60000 : 30000;
           const stable = await waitStable(3000, maxWait);
+          if (!stable) {
+            throw new Error('Street-level tiles did not stabilize at SSE=' + s + ': screenshot not verified');
+          }
           const stats = tileset._statistics || {};
           const loaded = stats.numberOfLoadedTilesTotal || '?';
           const commands = stats.numberOfCommands || '?';
